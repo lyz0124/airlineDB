@@ -8,9 +8,3 @@ env/
 # IDE
 .cursor/
 .vscode/
-
-# local database scripts folder
-database/
-
-# local env file
-.env
