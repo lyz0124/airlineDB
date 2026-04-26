@@ -1,3 +1,5 @@
+# macOS
+.DS_Store
 
 # Python
 __pycache__/
@@ -8,3 +10,9 @@ env/
 # IDE
 .cursor/
 .vscode/
+
+# local database scripts folder
+database/
+
+# local env file
+.env
