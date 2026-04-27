@@ -64,31 +64,22 @@
 
           <div class="table-responsive">
             <table class="table table-sm align-middle">
-              <thead><tr><th>Airline</th><th>Flight #</th><th>Route</th><th>Departure</th><th>Price</th><th>Remaining</th><th>Seat Classes</th><th>Action</th></tr></thead>
+              <thead><tr><th>Airline</th><th>Flight #</th><th>Route</th><th>Departure</th><th>Price</th><th>Remaining</th><th>Action</th></tr></thead>
               <tbody>
                 {% for row in customer_data.search_results %}
                   <tr>
                     <td>{{ row.airline_name }}</td><td>{{ row.flight_num }}</td><td>{{ row.departure_airport }} -> {{ row.arrival_airport }}</td><td>{{ row.departure_time }}</td>
-                    <td>{{ row.price }}</td><td>{{ row.remaining_seats }}</td><td>{{ row.seat_classes or "N/A" }}</td>
+                    <td>{{ row.price }}</td><td>{{ row.remaining_seats }}</td>
                     <td>
                       <form method="post" action="{{ url_for('customer_purchase') }}">
                         <input type="hidden" name="airline_name" value="{{ row.airline_name }}">
                         <input type="hidden" name="flight_num" value="{{ row.flight_num }}">
-                        <select class="form-select form-select-sm mb-2" name="seat_class" required>
-                          {% if row.seat_class_options %}
-                            {% for seat_class in row.seat_class_options %}
-                              <option value="{{ seat_class }}">{{ seat_class }}</option>
-                            {% endfor %}
-                          {% else %}
-                            <option value="">No seat class configured</option>
-                          {% endif %}
-                        </select>
-                        <button class="btn btn-sm btn-success" type="submit" {% if row.remaining_seats <= 0 or not row.seat_class_options %}disabled{% endif %}>Buy</button>
+                        <button class="btn btn-sm btn-success" type="submit" {% if row.remaining_seats <= 0 %}disabled{% endif %}>Buy</button>
                       </form>
                     </td>
                   </tr>
                 {% else %}
-                  <tr><td colspan="8" class="text-muted">No flights available.</td></tr>
+                  <tr><td colspan="7" class="text-muted">No flights available.</td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -122,32 +113,23 @@
           <p><strong>Authorized Airlines:</strong> {{ agent_data.authorized_airlines | join(", ") if agent_data.authorized_airlines else "None" }}</p>
           <div class="table-responsive">
             <table class="table table-sm align-middle">
-              <thead><tr><th>Airline</th><th>Flight #</th><th>Route</th><th>Departure</th><th>Remaining</th><th>Seat Classes</th><th>Sell</th></tr></thead>
+              <thead><tr><th>Airline</th><th>Flight #</th><th>Route</th><th>Departure</th><th>Remaining</th><th>Sell</th></tr></thead>
               <tbody>
                 {% for row in agent_data.sale_flights %}
                   <tr>
                     <td>{{ row.airline_name }}</td><td>{{ row.flight_num }}</td><td>{{ row.departure_airport }} -> {{ row.arrival_airport }}</td>
-                    <td>{{ row.departure_time }}</td><td>{{ row.remaining_seats }}</td><td>{{ row.seat_classes or "N/A" }}</td>
+                    <td>{{ row.departure_time }}</td><td>{{ row.remaining_seats }}</td>
                     <td>
                       <form method="post" action="{{ url_for('agent_purchase') }}" class="d-flex gap-2">
                         <input type="hidden" name="airline_name" value="{{ row.airline_name }}">
                         <input type="hidden" name="flight_num" value="{{ row.flight_num }}">
-                        <select class="form-select form-select-sm" name="seat_class" required>
-                          {% if row.seat_class_options %}
-                            {% for seat_class in row.seat_class_options %}
-                              <option value="{{ seat_class }}">{{ seat_class }}</option>
-                            {% endfor %}
-                          {% else %}
-                            <option value="">No seat class configured</option>
-                          {% endif %}
-                        </select>
                         <input class="form-control form-control-sm" type="email" name="customer_email" placeholder="customer@email.com" required>
-                        <button class="btn btn-sm btn-success" type="submit" {% if row.remaining_seats <= 0 or not row.seat_class_options %}disabled{% endif %}>Sell</button>
+                        <button class="btn btn-sm btn-success" type="submit" {% if row.remaining_seats <= 0 %}disabled{% endif %}>Sell</button>
                       </form>
                     </td>
                   </tr>
                 {% else %}
-                  <tr><td colspan="7" class="text-muted">No flights found.</td></tr>
+                  <tr><td colspan="6" class="text-muted">No flights found.</td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -193,6 +175,7 @@
               <form method="post" action="{{ url_for('staff_add_airplane') }}" class="row g-2">
                 <div class="col-6"><input class="form-control" name="airline_name" value="{{ staff_data.airline_name }}" placeholder="Airline Code/Name (e.g. MU)" required></div>
                 <div class="col-6"><input class="form-control" name="airplane_id" placeholder="Airplane ID (integer)" required></div>
+                <div class="col-12"><input class="form-control" name="seat_capacity" placeholder="Seat Capacity (integer)" required></div>
                 <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">Add Airplane</button></div>
               </form>
             </div>

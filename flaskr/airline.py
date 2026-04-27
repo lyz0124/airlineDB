@@ -10,7 +10,7 @@ DB_CONFIG = {
     "host": "localhost",
     "user": "root",
     "password": "",
-    "database": "Airline_booking",
+    "database": "air_reservation",
     "cursorclass": pymysql.cursors.DictCursor,
     "autocommit": False
 }
@@ -73,81 +73,54 @@ def require_login(role=None):
 def get_staff_profile(cur, username):
     cur.execute(
         """
-        SELECT username, airline_name, first_name, last_name
+        SELECT username, airline_name, role, first_name, last_name
         FROM Airline_Staff
         WHERE username = %s
         """,
         (username,)
     )
-    profile = cur.fetchone()
-    if not profile:
-        return None
-    cur.execute(
-        """
-        SELECT permission
-        FROM Staff_Permission
-        WHERE username = %s
-        """,
-        (username,)
-    )
-    permissions = {row["permission"].lower() for row in cur.fetchall()}
-    profile["permissions"] = permissions
-    if {"admin", "operator"} <= permissions:
-        profile["role_label"] = "both"
-    elif "admin" in permissions:
-        profile["role_label"] = "admin"
-    elif "operator" in permissions:
-        profile["role_label"] = "operator"
-    else:
-        profile["role_label"] = "none"
-    return profile
+    return cur.fetchone()
 
 
-def staff_has_permission(permissions, required):
-    normalized_permissions = {p.lower() for p in (permissions or set())}
-    return required in normalized_permissions
+def staff_has_permission(staff_role, required):
+    normalized = (staff_role or "").lower()
+    if normalized == "both":
+        return True
+    return normalized == required
 
 
 def get_next_ticket_id(cur):
-    cur.execute("SELECT COALESCE(MAX(CAST(ticket_id AS UNSIGNED)), 0) + 1 AS next_id FROM Ticket")
+    cur.execute("SELECT COALESCE(MAX(ticket_id), 0) + 1 AS next_id FROM Ticket")
     row = cur.fetchone()
-    return str(row["next_id"])
+    return row["next_id"]
 
 
-def get_flight_capacity_and_price(cur, airline_name, flight_num, seat_class):
+def get_flight_capacity_and_price(cur, airline_name, flight_num):
     cur.execute(
         """
         SELECT
             f.airline_name,
             f.flight_num,
-            f.airplane_id,
-            f.departure_airport,
-            f.arrival_airport,
             f.departure_time,
             f.arrival_time,
             f.price,
             f.status,
-            sc.seat_class,
-            sc.capacity,
-            sc.price_factor,
+            ap.seat_capacity,
             COUNT(t.ticket_id) AS sold_tickets
         FROM Flight f
-        JOIN seat_class sc
-          ON sc.airline_name = f.airline_name
-         AND sc.airplane_id = f.airplane_id
+        JOIN Airplane ap
+          ON ap.airline_name = f.airline_name
+         AND ap.airplane_id = f.airplane_id
         LEFT JOIN Ticket t
           ON t.airline_name = f.airline_name
          AND t.flight_num = f.flight_num
-         AND t.seat_class = sc.seat_class
         WHERE f.airline_name = %s
           AND f.flight_num = %s
-          AND sc.seat_class = %s
         GROUP BY
-            f.airline_name, f.flight_num, f.airplane_id, f.departure_airport,
-            f.arrival_airport, f.departure_time, f.arrival_time,
-            f.price, f.status, sc.seat_class, sc.capacity, sc.price_factor
+            f.airline_name, f.flight_num, f.departure_time, f.arrival_time,
+            f.price, f.status, ap.seat_capacity
         """,
-        (airline_name, flight_num, seat_class)
+        (airline_name, flight_num)
     )
     return cur.fetchone()
 
@@ -156,8 +129,8 @@ def is_agent_authorized(cur, agent_email, airline_name):
     cur.execute(
         """
         SELECT 1
-        FROM Authorized_By
-        WHERE booking_agent_email = %s
+        FROM agent_airline_authorization
+        WHERE agent_email = %s
           AND airline_name = %s
         """,
         (agent_email, airline_name)
@@ -165,10 +138,10 @@ def is_agent_authorized(cur, agent_email, airline_name):
     return cur.fetchone() is not None
 
 
-def create_purchase(cur, customer_email, airline_name, flight_num, seat_class, booking_agent_email=None):
-    flight = get_flight_capacity_and_price(cur, airline_name, flight_num, seat_class)
+def create_purchase(cur, customer_email, airline_name, flight_num, booking_agent_email=None):
+    flight = get_flight_capacity_and_price(cur, airline_name, flight_num)
     if not flight:
-        return False, "Flight or seat class does not exist."
+        return False, "Flight does not exist."
 
     if flight["departure_time"] <= datetime.now():
         return False, "Only future flights can be purchased."
@@ -176,38 +149,24 @@ def create_purchase(cur, customer_email, airline_name, flight_num, seat_class, b
     if flight["status"] != "upcoming":
         return False, "Only upcoming flights can be purchased."
 
-    if int(flight["sold_tickets"]) >= int(flight["capacity"]):
-        return False, f"This flight is sold out for seat class {seat_class}."
+    if flight["sold_tickets"] >= flight["seat_capacity"]:
+        return False, "This flight is sold out."
 
     cur.execute("SELECT 1 FROM Customer WHERE email = %s", (customer_email,))
     if not cur.fetchone():
         return False, "Customer does not exist."
 
-    # Pricing is enforced server-side by using Flight.price * seat_class.price_factor.
+    # Pricing is enforced server-side by always reading current price from DB.
     if float(flight["price"]) <= 0:
         return False, "Invalid flight pricing configuration."
-    if float(flight["price_factor"]) <= 0:
-        return False, "Invalid seat class pricing factor."
-
-    price_charged = round(float(flight["price"]) * float(flight["price_factor"]), 2)
 
     ticket_id = get_next_ticket_id(cur)
     cur.execute(
         """
-        INSERT INTO Ticket
-        (ticket_id, airline_name, flight_num, airplane_id, seat_class, price_charged, departure_airport, arrival_airport)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO Ticket (ticket_id, airline_name, flight_num)
+        VALUES (%s, %s, %s)
         """,
-        (
-            ticket_id,
-            airline_name,
-            flight_num,
-            flight["airplane_id"],
-            seat_class,
-            price_charged,
-            flight["departure_airport"],
-            flight["arrival_airport"]
-        )
+        (ticket_id, airline_name, flight_num)
     )
     cur.execute(
         """
@@ -216,7 +175,7 @@ def create_purchase(cur, customer_email, airline_name, flight_num, seat_class, b
         """,
         (ticket_id, customer_email, booking_agent_email)
     )
-    return True, f"Ticket purchased successfully. Ticket ID: {ticket_id}. Charged: {price_charged}"
+    return True, f"Ticket purchased successfully. Ticket ID: {ticket_id}"
 
 
 def month_labels_between(start_date, end_date):
@@ -287,8 +246,8 @@ def register_page():
                 cur.execute(
                     """
                     INSERT INTO Customer
-                    (email, name, password, building_name, street, city, state, phone_number,
-                     passport_number, passport_expiration_date, passport_country, date_of_birth)
+                    (email, name, password, building_number, street, city, state, phone_number,
+                     passport_number, passport_expiration, passport_country, date_of_birth)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
@@ -298,11 +257,6 @@ def register_page():
                 )
 
             elif role == "booking_agent":
-                booking_agent_id = request.form.get("booking_agent_id", "").strip()
-                if not booking_agent_id:
-                    flash("Booking Agent ID is required.")
-                    return redirect(url_for("register_page"))
-
                 cur.execute("SELECT 1 FROM booking_agent WHERE email = %s", (username,))
                 if cur.fetchone():
                     flash("Booking agent email already exists.")
@@ -310,37 +264,17 @@ def register_page():
 
                 cur.execute(
                     """
-                    SELECT 1
-                    FROM information_schema.columns
-                    WHERE table_schema = DATABASE()
-                      AND table_name = 'booking_agent'
-                      AND column_name = 'booking_agent_id'
-                    """
+                    INSERT INTO booking_agent (email, password)
+                    VALUES (%s, %s)
+                    """,
+                    (username, password_hash)
                 )
-                has_agent_id_column = cur.fetchone() is not None
-
-                if has_agent_id_column:
-                    cur.execute(
-                        """
-                        INSERT INTO booking_agent (email, password, booking_agent_id)
-                        VALUES (%s, %s, %s)
-                        """,
-                        (username, password_hash, booking_agent_id)
-                    )
-                else:
-                    cur.execute(
-                        """
-                        INSERT INTO booking_agent (email, password)
-                        VALUES (%s, %s)
-                        """,
-                        (username, password_hash)
-                    )
 
             else:
                 airline_name = request.form.get("airline_name", "").strip()
                 staff_dob = request.form.get("staff_dob", "").strip()
-                if not airline_name:
-                    flash("Airline name is required for staff.")
+                if not airline_name or not staff_dob:
+                    flash("Airline name and date of birth are required for staff.")
                     return redirect(url_for("register_page"))
 
                 first_name, last_name = split_name(name)
@@ -504,16 +438,16 @@ def public_search_flights():
                     f.airline_name,
                     f.flight_num,
                     f.departure_airport,
-                    dep.city AS departure_city,
+                    dep.airport_city AS departure_city,
                     f.departure_time,
                     f.arrival_airport,
-                    arr.city AS arrival_city,
+                    arr.airport_city AS arrival_city,
                     f.arrival_time,
                     f.price,
                     f.status
                 FROM Flight f
-                JOIN Airport dep ON dep.name = f.departure_airport
-                JOIN Airport arr ON arr.name = f.arrival_airport
+                JOIN Airport dep ON dep.airport_name = f.departure_airport
+                JOIN Airport arr ON arr.airport_name = f.arrival_airport
                 WHERE f.departure_time >= NOW()
             """
             params = []
@@ -525,10 +459,10 @@ def public_search_flights():
                 sql += " AND f.arrival_airport = %s"
                 params.append(search_form["arrival_airport"])
             if search_form["departure_city"]:
-                sql += " AND dep.city = %s"
+                sql += " AND dep.airport_city = %s"
                 params.append(search_form["departure_city"])
             if search_form["arrival_city"]:
-                sql += " AND arr.city = %s"
+                sql += " AND arr.airport_city = %s"
                 params.append(search_form["arrival_city"])
             if departure_date:
                 sql += " AND DATE(f.departure_time) = %s"
@@ -584,10 +518,13 @@ def public_flight_status():
             status_message="Airline and flight number are required.",
             status_message_type="warning"
         )
-
-    if not status_form["flight_num"]:
-        flash("Flight number is required.")
-        return render_public_page(status_form=status_form, status_submitted=True)
+    if not status_form["flight_num"].isdigit():
+        return render_public_page(
+            status_form=status_form,
+            status_submitted=True,
+            status_message="Flight number must be a positive integer.",
+            status_message_type="warning"
+        )
 
     conn = None
     try:
@@ -608,7 +545,7 @@ def public_flight_status():
                   AND flight_num = %s
                   AND status = 'in-progress'
                 """,
-                (status_form["airline_name"], status_form["flight_num"])
+                (status_form["airline_name"], int(status_form["flight_num"]))
             )
             row = cur.fetchone()
 
@@ -663,7 +600,7 @@ def load_customer_dashboard(cur, customer_email, args):
             f.departure_time,
             f.arrival_time,
             f.status,
-            t.price_charged AS price
+            f.price
         FROM Purchases p
         JOIN Ticket t ON t.ticket_id = p.ticket_id
         JOIN Flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
@@ -703,34 +640,20 @@ def load_customer_dashboard(cur, customer_email, args):
             f.airline_name,
             f.flight_num,
             f.departure_airport,
-            dep.city AS departure_city,
+            dep.airport_city AS departure_city,
             f.departure_time,
             f.arrival_airport,
-            arr.city AS arrival_city,
+            arr.airport_city AS arrival_city,
             f.arrival_time,
             f.price,
             f.status,
-            COALESCE((
-                SELECT SUM(sc.capacity)
-                FROM seat_class sc
-                WHERE sc.airline_name = f.airline_name
-                  AND sc.airplane_id = f.airplane_id
-            ), 0) AS total_capacity,
-            (
-                SELECT COUNT(*)
-                FROM Ticket t
-                WHERE t.airline_name = f.airline_name
-                  AND t.flight_num = f.flight_num
-            ) AS sold_tickets,
-            (
-                SELECT GROUP_CONCAT(sc.seat_class ORDER BY sc.seat_class SEPARATOR ',')
-                FROM seat_class sc
-                WHERE sc.airline_name = f.airline_name
-                  AND sc.airplane_id = f.airplane_id
-            ) AS seat_classes
+            ap.seat_capacity,
+            COUNT(t.ticket_id) AS sold_tickets
         FROM Flight f
-        JOIN Airport dep ON dep.name = f.departure_airport
-        JOIN Airport arr ON arr.name = f.arrival_airport
+        JOIN Airport dep ON dep.airport_name = f.departure_airport
+        JOIN Airport arr ON arr.airport_name = f.arrival_airport
+        JOIN Airplane ap ON ap.airline_name = f.airline_name AND ap.airplane_id = f.airplane_id
+        LEFT JOIN Ticket t ON t.airline_name = f.airline_name AND t.flight_num = f.flight_num
         WHERE f.departure_time >= NOW()
           AND f.status = 'upcoming'
     """
@@ -743,27 +666,34 @@ def load_customer_dashboard(cur, customer_email, args):
         search_sql += " AND f.arrival_airport = %s"
         search_params.append(search_filters["arrival_airport"])
     if search_filters["departure_city"]:
-        search_sql += " AND dep.city = %s"
+        search_sql += " AND dep.airport_city = %s"
         search_params.append(search_filters["departure_city"])
     if search_filters["arrival_city"]:
-        search_sql += " AND arr.city = %s"
+        search_sql += " AND arr.airport_city = %s"
         search_params.append(search_filters["arrival_city"])
     if search_filters["departure_date"]:
         search_sql += " AND DATE(f.departure_time) = %s"
         search_params.append(search_filters["departure_date"])
 
-    search_sql += " ORDER BY f.departure_time ASC LIMIT 200"
+    search_sql += """
+        GROUP BY
+            f.airline_name, f.flight_num, f.departure_airport, dep.airport_city,
+            f.departure_time, f.arrival_airport, arr.airport_city, f.arrival_time,
+            f.price, f.status, ap.seat_capacity
+        ORDER BY f.departure_time ASC
+        LIMIT 200
+    """
     cur.execute(search_sql, tuple(search_params))
     search_results = cur.fetchall()
     for row in search_results:
-        row["remaining_seats"] = int(row["total_capacity"]) - int(row["sold_tickets"])
-        row["seat_class_options"] = (row.get("seat_classes") or "").split(",") if row.get("seat_classes") else []
+        row["remaining_seats"] = int(row["seat_capacity"]) - int(row["sold_tickets"])
 
     cur.execute(
         """
-        SELECT COALESCE(SUM(t.price_charged), 0) AS total_spending_12m
+        SELECT COALESCE(SUM(f.price), 0) AS total_spending_12m
         FROM Purchases p
         JOIN Ticket t ON t.ticket_id = p.ticket_id
+        JOIN Flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
         WHERE p.customer_email = %s
           AND p.purchase_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
         """,
@@ -773,9 +703,10 @@ def load_customer_dashboard(cur, customer_email, args):
 
     cur.execute(
         """
-        SELECT DATE_FORMAT(p.purchase_date, '%%Y-%%m') AS month, COALESCE(SUM(t.price_charged), 0) AS amount
+        SELECT DATE_FORMAT(p.purchase_date, '%%Y-%%m') AS month, COALESCE(SUM(f.price), 0) AS amount
         FROM Purchases p
         JOIN Ticket t ON t.ticket_id = p.ticket_id
+        JOIN Flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
         WHERE p.customer_email = %s
           AND p.purchase_date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
         GROUP BY DATE_FORMAT(p.purchase_date, '%%Y-%%m')
@@ -797,9 +728,10 @@ def load_customer_dashboard(cur, customer_email, args):
     if custom_start and custom_end:
         cur.execute(
             """
-            SELECT COALESCE(SUM(t.price_charged), 0) AS total
+            SELECT COALESCE(SUM(f.price), 0) AS total
             FROM Purchases p
             JOIN Ticket t ON t.ticket_id = p.ticket_id
+            JOIN Flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
             WHERE p.customer_email = %s
               AND p.purchase_date BETWEEN %s AND %s
             """,
@@ -809,9 +741,10 @@ def load_customer_dashboard(cur, customer_email, args):
 
         cur.execute(
             """
-            SELECT DATE_FORMAT(p.purchase_date, '%%Y-%%m') AS month, COALESCE(SUM(t.price_charged), 0) AS amount
+            SELECT DATE_FORMAT(p.purchase_date, '%%Y-%%m') AS month, COALESCE(SUM(f.price), 0) AS amount
             FROM Purchases p
             JOIN Ticket t ON t.ticket_id = p.ticket_id
+            JOIN Flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
             WHERE p.customer_email = %s
               AND p.purchase_date BETWEEN %s AND %s
             GROUP BY DATE_FORMAT(p.purchase_date, '%%Y-%%m')
@@ -867,7 +800,7 @@ def load_agent_dashboard(cur, agent_email, args):
             f.arrival_airport,
             f.departure_time,
             f.arrival_time,
-            t.price_charged AS price
+            f.price
         FROM Purchases p
         JOIN Ticket t ON t.ticket_id = p.ticket_id
         JOIN Flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
@@ -893,8 +826,8 @@ def load_agent_dashboard(cur, agent_email, args):
     cur.execute(
         """
         SELECT airline_name
-        FROM Authorized_By
-        WHERE booking_agent_email = %s
+        FROM agent_airline_authorization
+        WHERE agent_email = %s
         ORDER BY airline_name
         """,
         (agent_email,)
@@ -915,27 +848,13 @@ def load_agent_dashboard(cur, agent_email, args):
             f.departure_time,
             f.arrival_time,
             f.price,
-            COALESCE((
-                SELECT SUM(sc.capacity)
-                FROM seat_class sc
-                WHERE sc.airline_name = f.airline_name
-                  AND sc.airplane_id = f.airplane_id
-            ), 0) AS total_capacity,
-            (
-                SELECT COUNT(*)
-                FROM Ticket t
-                WHERE t.airline_name = f.airline_name
-                  AND t.flight_num = f.flight_num
-            ) AS sold_tickets,
-            (
-                SELECT GROUP_CONCAT(sc.seat_class ORDER BY sc.seat_class SEPARATOR ',')
-                FROM seat_class sc
-                WHERE sc.airline_name = f.airline_name
-                  AND sc.airplane_id = f.airplane_id
-            ) AS seat_classes
+            ap.seat_capacity,
+            COUNT(t.ticket_id) AS sold_tickets
         FROM Flight f
-        JOIN Authorized_By aa ON aa.airline_name = f.airline_name
-        WHERE aa.booking_agent_email = %s
+        JOIN agent_airline_authorization aa ON aa.airline_name = f.airline_name
+        JOIN Airplane ap ON ap.airline_name = f.airline_name AND ap.airplane_id = f.airplane_id
+        LEFT JOIN Ticket t ON t.airline_name = f.airline_name AND t.flight_num = f.flight_num
+        WHERE aa.agent_email = %s
           AND f.departure_time >= NOW()
           AND f.status = 'upcoming'
     """
@@ -946,21 +865,26 @@ def load_agent_dashboard(cur, agent_email, args):
     if search_filters["departure_date"]:
         search_sql += " AND DATE(f.departure_time) = %s"
         search_params.append(search_filters["departure_date"])
-    search_sql += " ORDER BY f.departure_time ASC"
+    search_sql += """
+        GROUP BY
+            f.airline_name, f.flight_num, f.departure_airport, f.arrival_airport,
+            f.departure_time, f.arrival_time, f.price, ap.seat_capacity
+        ORDER BY f.departure_time ASC
+    """
     cur.execute(search_sql, tuple(search_params))
     sale_flights = cur.fetchall()
     for row in sale_flights:
-        row["remaining_seats"] = int(row["total_capacity"]) - int(row["sold_tickets"])
-        row["seat_class_options"] = (row.get("seat_classes") or "").split(",") if row.get("seat_classes") else []
+        row["remaining_seats"] = int(row["seat_capacity"]) - int(row["sold_tickets"])
 
     cur.execute(
         """
         SELECT
-            COALESCE(SUM(t.price_charged * 0.1), 0) AS commission_total,
-            COALESCE(AVG(t.price_charged * 0.1), 0) AS avg_commission,
+            COALESCE(SUM(f.price * 0.1), 0) AS commission_total,
+            COALESCE(AVG(f.price * 0.1), 0) AS avg_commission,
             COUNT(*) AS tickets_sold
         FROM Purchases p
         JOIN Ticket t ON t.ticket_id = p.ticket_id
+        JOIN Flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
         WHERE p.booking_agent_email = %s
           AND p.purchase_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
         """,
@@ -988,9 +912,10 @@ def load_agent_dashboard(cur, agent_email, args):
         """
         SELECT
             p.customer_email,
-            COALESCE(SUM(t.price_charged * 0.1), 0) AS commission
+            COALESCE(SUM(f.price * 0.1), 0) AS commission
         FROM Purchases p
         JOIN Ticket t ON t.ticket_id = p.ticket_id
+        JOIN Flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
         WHERE p.booking_agent_email = %s
           AND p.purchase_date >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR)
         GROUP BY p.customer_email
@@ -1021,7 +946,7 @@ def load_staff_dashboard(cur, staff_user, args):
         return None
 
     airline_name = profile["airline_name"]
-    staff_role = profile.get("role_label", "none")
+    staff_role = (profile.get("role") or "admin").lower()
     default_start = date.today()
     default_end = date.today() + timedelta(days=30)
 
@@ -1111,7 +1036,7 @@ def load_staff_dashboard(cur, staff_user, args):
         SELECT
             p.booking_agent_email AS agent_email,
             COUNT(*) AS ticket_count,
-            COALESCE(SUM(t.price_charged * 0.1), 0) AS commission_total
+            COALESCE(SUM(f.price * 0.1), 0) AS commission_total
         FROM Purchases p
         JOIN Ticket t ON t.ticket_id = p.ticket_id
         JOIN Flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
@@ -1181,13 +1106,13 @@ def load_staff_dashboard(cur, staff_user, args):
         """
         SELECT
             f.arrival_airport,
-            a.city AS airport_city,
+            a.airport_city,
             COUNT(*) AS flight_count
         FROM Flight f
-        JOIN Airport a ON a.name = f.arrival_airport
+        JOIN Airport a ON a.airport_name = f.arrival_airport
         WHERE f.airline_name = %s
           AND f.departure_time >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
-        GROUP BY f.arrival_airport, a.city
+        GROUP BY f.arrival_airport, a.airport_city
         ORDER BY flight_count DESC
         LIMIT 5
         """,
@@ -1199,13 +1124,13 @@ def load_staff_dashboard(cur, staff_user, args):
         """
         SELECT
             f.arrival_airport,
-            a.city AS airport_city,
+            a.airport_city,
             COUNT(*) AS flight_count
         FROM Flight f
-        JOIN Airport a ON a.name = f.arrival_airport
+        JOIN Airport a ON a.airport_name = f.arrival_airport
         WHERE f.airline_name = %s
           AND f.departure_time >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
-        GROUP BY f.arrival_airport, a.city
+        GROUP BY f.arrival_airport, a.airport_city
         ORDER BY flight_count DESC
         LIMIT 5
         """,
@@ -1244,8 +1169,7 @@ def customer_purchase():
 
     airline_name = request.form.get("airline_name", "").strip()
     flight_num_text = request.form.get("flight_num", "").strip()
-    seat_class = request.form.get("seat_class", "").strip()
-    if not airline_name or not flight_num_text or not seat_class:
+    if not airline_name or not flight_num_text.isdigit():
         flash("Invalid airline or flight number.")
         return redirect(url_for("dashboard", tab="customer-search"))
 
@@ -1253,7 +1177,7 @@ def customer_purchase():
     try:
         conn = get_conn()
         with conn.cursor() as cur:
-            success, message = create_purchase(cur, customer_email, airline_name, flight_num_text, seat_class)
+            success, message = create_purchase(cur, customer_email, airline_name, int(flight_num_text))
             if success:
                 conn.commit()
                 flash(message)
@@ -1280,8 +1204,7 @@ def agent_purchase():
     customer_email = request.form.get("customer_email", "").strip()
     airline_name = request.form.get("airline_name", "").strip()
     flight_num_text = request.form.get("flight_num", "").strip()
-    seat_class = request.form.get("seat_class", "").strip()
-    if not customer_email or not airline_name or not flight_num_text or not seat_class:
+    if not customer_email or not airline_name or not flight_num_text.isdigit():
         flash("Customer, airline, and numeric flight number are required.")
         return redirect(url_for("dashboard", tab="agent-search"))
 
@@ -1297,8 +1220,7 @@ def agent_purchase():
                 cur,
                 customer_email,
                 airline_name,
-                flight_num_text,
-                seat_class,
+                int(flight_num_text),
                 booking_agent_email=agent_email
             )
             if success:
@@ -1335,12 +1257,13 @@ def staff_add_airport():
         conn = get_conn()
         with conn.cursor() as cur:
             profile = get_staff_profile(cur, staff_user)
-            if not profile or not staff_has_permission(profile.get("permissions"), "admin"):
+            if not profile or not staff_has_permission(profile.get("role"), "admin"):
                 flash("Admin permission required.")
                 return redirect(url_for("dashboard", tab="staff-admin"))
+            cur.execute("INSERT IGNORE INTO City (city_name) VALUES (%s)", (airport_city,))
             cur.execute(
                 """
-                INSERT INTO Airport (name, city)
+                INSERT INTO Airport (airport_name, airport_city)
                 VALUES (%s, %s)
                 """,
                 (airport_name, airport_city)
@@ -1364,13 +1287,10 @@ def staff_add_airplane():
     if not staff_user:
         return redirect(url_for("login_page"))
 
-    airline_name = request.form.get("airline_name", "").strip()
     airplane_id_text = request.form.get("airplane_id", "").strip()
-    if not airline_name:
-        flash("Airline code/name is required.")
-        return redirect(url_for("dashboard", tab="staff-admin"))
-    if not airplane_id_text.isdigit():
-        flash("Airplane ID must be an integer.")
+    seat_capacity_text = request.form.get("seat_capacity", "").strip()
+    if not airplane_id_text.isdigit() or not seat_capacity_text.isdigit():
+        flash("Airplane ID and seat capacity must be integers.")
         return redirect(url_for("dashboard", tab="staff-admin"))
 
     conn = None
@@ -1378,19 +1298,16 @@ def staff_add_airplane():
         conn = get_conn()
         with conn.cursor() as cur:
             profile = get_staff_profile(cur, staff_user)
-            if not profile or not staff_has_permission(profile.get("permissions"), "admin"):
+            if not profile or not staff_has_permission(profile.get("role"), "admin"):
                 flash("Admin permission required.")
-                return redirect(url_for("dashboard", tab="staff-admin"))
-            if airline_name != profile["airline_name"]:
-                flash("You can only add airplane for your own airline.")
                 return redirect(url_for("dashboard", tab="staff-admin"))
 
             cur.execute(
                 """
-                INSERT INTO airplane (airline_name, ID)
-                VALUES (%s, %s)
+                INSERT INTO airplane (airline_name, airplane_id, seat_capacity)
+                VALUES (%s, %s, %s)
                 """,
-                (airline_name, int(airplane_id_text))
+                (profile["airline_name"], int(airplane_id_text), int(seat_capacity_text))
             )
             conn.commit()
             flash("Airplane added successfully.")
@@ -1425,7 +1342,7 @@ def staff_create_flight():
     status = request.form.get("status", "upcoming").strip()
     airplane_id_text = request.form.get("airplane_id", "").strip()
 
-    if not flight_num_text or not airplane_id_text.isdigit():
+    if not flight_num_text.isdigit() or not airplane_id_text.isdigit():
         flash("Flight number is required and airplane ID must be an integer.")
         return redirect(url_for("dashboard", tab="staff-admin"))
 
@@ -1448,7 +1365,7 @@ def staff_create_flight():
         conn = get_conn()
         with conn.cursor() as cur:
             profile = get_staff_profile(cur, staff_user)
-            if not profile or not staff_has_permission(profile.get("permissions"), "admin"):
+            if not profile or not staff_has_permission(profile.get("role"), "admin"):
                 flash("Admin permission required.")
                 return redirect(url_for("dashboard", tab="staff-admin"))
 
@@ -1461,7 +1378,7 @@ def staff_create_flight():
                 """,
                 (
                     profile["airline_name"],
-                    flight_num_text,
+                    int(flight_num_text),
                     departure_airport,
                     dep_dt,
                     arrival_airport,
@@ -1509,13 +1426,16 @@ def staff_edit_flight():
     if not airline_name or not flight_num:
         flash("Airline and current flight number are required.")
         return redirect(url_for("dashboard", tab="staff-admin"))
+    if not flight_num.isdigit():
+        flash("Current flight number must be an integer.")
+        return redirect(url_for("dashboard", tab="staff-admin"))
 
     conn = None
     try:
         conn = get_conn()
         with conn.cursor() as cur:
             profile = get_staff_profile(cur, staff_user)
-            if not profile or not staff_has_permission(profile.get("permissions"), "admin"):
+            if not profile or not staff_has_permission(profile.get("role"), "admin"):
                 flash("Admin permission required.")
                 return redirect(url_for("dashboard", tab="staff-admin"))
             if airline_name != profile["airline_name"]:
@@ -1529,14 +1449,17 @@ def staff_edit_flight():
                 FROM Flight
                 WHERE airline_name = %s AND flight_num = %s
                 """,
-                (airline_name, flight_num)
+                (airline_name, int(flight_num))
             )
             existing = cur.fetchone()
             if not existing:
                 flash("Flight not found.")
                 return redirect(url_for("dashboard", tab="staff-admin"))
 
-            target_flight_num = new_flight_num or existing["flight_num"]
+            if new_flight_num and not new_flight_num.isdigit():
+                flash("New flight number must be an integer.")
+                return redirect(url_for("dashboard", tab="staff-admin"))
+            target_flight_num = int(new_flight_num) if new_flight_num else int(existing["flight_num"])
             target_departure_airport = departure_airport or existing["departure_airport"]
             target_arrival_airport = arrival_airport or existing["arrival_airport"]
             target_status = status or existing["status"]
@@ -1583,7 +1506,7 @@ def staff_edit_flight():
                     target_status,
                     target_airplane_id,
                     airline_name,
-                    flight_num
+                    int(flight_num)
                 )
             )
             conn.commit()
@@ -1624,7 +1547,7 @@ def staff_authorize_agent():
         conn = get_conn()
         with conn.cursor() as cur:
             profile = get_staff_profile(cur, staff_user)
-            if not profile or not staff_has_permission(profile.get("permissions"), "admin"):
+            if not profile or not staff_has_permission(profile.get("role"), "admin"):
                 flash("Admin permission required.")
                 return redirect(url_for("dashboard", tab="staff-admin"))
 
@@ -1635,7 +1558,7 @@ def staff_authorize_agent():
 
             cur.execute(
                 """
-                INSERT IGNORE INTO Authorized_By (booking_agent_email, airline_name)
+                INSERT IGNORE INTO agent_airline_authorization (agent_email, airline_name)
                 VALUES (%s, %s)
                 """,
                 (agent_email, profile["airline_name"])
@@ -1662,7 +1585,7 @@ def staff_update_flight_status():
     airline_name = request.form.get("airline_name", "").strip()
     flight_num_text = request.form.get("flight_num", "").strip()
     status = request.form.get("status", "").strip()
-    if not flight_num_text or status not in {"upcoming", "in-progress", "delayed"}:
+    if not flight_num_text.isdigit() or status not in {"upcoming", "in-progress", "delayed"}:
         flash("Invalid input for status update.")
         return redirect(url_for("dashboard", tab="staff-operator"))
 
@@ -1671,7 +1594,7 @@ def staff_update_flight_status():
         conn = get_conn()
         with conn.cursor() as cur:
             profile = get_staff_profile(cur, staff_user)
-            if not profile or not staff_has_permission(profile.get("permissions"), "operator"):
+            if not profile or not staff_has_permission(profile.get("role"), "operator"):
                 flash("Operator permission required.")
                 return redirect(url_for("dashboard", tab="staff-operator"))
 
@@ -1685,7 +1608,7 @@ def staff_update_flight_status():
                 SET status = %s
                 WHERE airline_name = %s AND flight_num = %s
                 """,
-                (status, airline_name, flight_num_text)
+                (status, airline_name, int(flight_num_text))
             )
             if cur.rowcount == 0:
                 flash("Flight not found.")
