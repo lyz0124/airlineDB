@@ -9,7 +9,7 @@ airline.secret_key="dev-secret-key"
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",
-    "password": "",
+    "password": "example",
     "database": "air_reservation",
     "cursorclass": pymysql.cursors.DictCursor,
     "autocommit": False
