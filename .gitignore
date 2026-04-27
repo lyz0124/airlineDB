@@ -10,6 +10,7 @@ env/
 # IDE
 .cursor/
 .vscode/
+.codex
 
 # local database scripts folder
 database/
