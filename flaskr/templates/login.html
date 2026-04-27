@@ -17,7 +17,7 @@
                 <h2 class="mb-1">Login</h2>
                 <p class="text-muted mb-0">Air Ticket Reservation System</p>
               </div>
-              <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('register_page') }}">Register</a>
+              <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('auth.register_page') }}">Register</a>
             </div>
 
             {% with messages = get_flashed_messages() %}
@@ -30,7 +30,7 @@
               {% endif %}
             {% endwith %}
 
-            <form method="post" action="/login" class="row g-3">
+            <form method="post" action="{{ url_for('auth.login_page') }}" class="row g-3">
               <div class="col-12">
                 <label class="form-label">Role</label>
                 <select class="form-select" name="role" required>
@@ -59,7 +59,7 @@
         <div class="card shadow-sm border-0 mb-4">
           <div class="card-body p-4">
             <h4 class="mb-3">Public Search: Upcoming Flights</h4>
-            <form method="post" action="{{ url_for('public_search_flights') }}" class="row g-3">
+            <form method="post" action="{{ url_for('public.public_search_flights') }}" class="row g-3">
               <div class="col-md-6">
                 <label class="form-label">Departure Airport</label>
                 <input class="form-control" type="text" name="departure_airport" value="{{ (search_form or {}).get('departure_airport', '') }}">
@@ -133,7 +133,7 @@
         <div class="card shadow-sm border-0">
           <div class="card-body p-4">
             <h4 class="mb-3">Public Lookup: In-Progress Flight Status</h4>
-            <form method="post" action="{{ url_for('public_flight_status') }}" class="row g-3">
+            <form method="post" action="{{ url_for('public.public_flight_status') }}" class="row g-3">
               <div class="col-md-6">
                 <label class="form-label">Airline Name</label>
                 <input class="form-control" type="text" name="airline_name" value="{{ (status_form or {}).get('airline_name', '') }}" required>

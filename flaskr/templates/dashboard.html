@@ -13,7 +13,7 @@
         <h2 class="mb-1">Welcome, {{ user_name }}</h2>
         <p class="mb-0 text-muted">Role: {{ role }} | Account: {{ user_id }}</p>
       </div>
-      <form method="post" action="/logout">
+      <form method="post" action="{{ url_for('auth.logout') }}">
         <button class="btn btn-outline-danger" type="submit">Logout</button>
       </form>
     </div>
@@ -53,7 +53,7 @@
       <div class="card shadow-sm border-0 mb-4">
         <div class="card-body p-4">
           <h4 class="mb-3">Customer - Search Flights and Purchase</h4>
-          <form method="get" action="{{ url_for('dashboard') }}" class="row g-3 mb-3">
+          <form method="get" action="{{ url_for('dashboard.dashboard') }}" class="row g-3 mb-3">
             <div class="col-md-4"><input class="form-control" type="text" name="search_departure_airport" placeholder="Departure Airport" value="{{ customer_data.search_filters.departure_airport }}"></div>
             <div class="col-md-4"><input class="form-control" type="text" name="search_arrival_airport" placeholder="Arrival Airport" value="{{ customer_data.search_filters.arrival_airport }}"></div>
             <div class="col-md-4"><input class="form-control" type="date" name="search_departure_date" value="{{ customer_data.search_filters.departure_date }}"></div>
@@ -71,7 +71,7 @@
                     <td>{{ row.airline_name }}</td><td>{{ row.flight_num }}</td><td>{{ row.departure_airport }} -> {{ row.arrival_airport }}</td><td>{{ row.departure_time }}</td>
                     <td>{{ row.price }}</td><td>{{ row.remaining_seats }}</td>
                     <td>
-                      <form method="post" action="{{ url_for('customer_purchase') }}">
+                      <form method="post" action="{{ url_for('customer.customer_purchase') }}">
                         <input type="hidden" name="airline_name" value="{{ row.airline_name }}">
                         <input type="hidden" name="flight_num" value="{{ row.flight_num }}">
                         <button class="btn btn-sm btn-success" type="submit" {% if row.remaining_seats <= 0 %}disabled{% endif %}>Buy</button>
@@ -120,7 +120,7 @@
                     <td>{{ row.airline_name }}</td><td>{{ row.flight_num }}</td><td>{{ row.departure_airport }} -> {{ row.arrival_airport }}</td>
                     <td>{{ row.departure_time }}</td><td>{{ row.remaining_seats }}</td>
                     <td>
-                      <form method="post" action="{{ url_for('agent_purchase') }}" class="d-flex gap-2">
+                      <form method="post" action="{{ url_for('agent.agent_purchase') }}" class="d-flex gap-2">
                         <input type="hidden" name="airline_name" value="{{ row.airline_name }}">
                         <input type="hidden" name="flight_num" value="{{ row.flight_num }}">
                         <input class="form-control form-control-sm" type="email" name="customer_email" placeholder="customer@email.com" required>
@@ -165,14 +165,14 @@
           <div class="row g-4">
             <div class="col-md-6">
               <h6>Add Airport</h6>
-              <form method="post" action="{{ url_for('staff_add_airport') }}" class="row g-2 mb-3">
+              <form method="post" action="{{ url_for('staff.staff_add_airport') }}" class="row g-2 mb-3">
                 <div class="col-6"><input class="form-control" name="airport_name" placeholder="Airport code/name" required></div>
                 <div class="col-6"><input class="form-control" name="airport_city" placeholder="City" required></div>
                 <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">Add Airport</button></div>
               </form>
 
               <h6>Add Airplane</h6>
-              <form method="post" action="{{ url_for('staff_add_airplane') }}" class="row g-2">
+              <form method="post" action="{{ url_for('staff.staff_add_airplane') }}" class="row g-2">
                 <div class="col-6"><input class="form-control" name="airline_name" value="{{ staff_data.airline_name }}" placeholder="Airline Code/Name (e.g. MU)" required></div>
                 <div class="col-6"><input class="form-control" name="airplane_id" placeholder="Airplane ID (integer)" required></div>
                 <div class="col-12"><input class="form-control" name="seat_capacity" placeholder="Seat Capacity (integer)" required></div>
@@ -181,7 +181,7 @@
             </div>
             <div class="col-md-6">
               <h6>Create Flight</h6>
-              <form method="post" action="{{ url_for('staff_create_flight') }}" class="row g-2 mb-3">
+              <form method="post" action="{{ url_for('staff.staff_create_flight') }}" class="row g-2 mb-3">
                 <div class="col-6"><input class="form-control" name="flight_num" placeholder="Flight Number" required></div>
                 <div class="col-6"><input class="form-control" name="airplane_id" placeholder="Airplane ID" required></div>
                 <div class="col-6"><input class="form-control" name="departure_airport" placeholder="Departure Airport" required></div>
@@ -200,7 +200,7 @@
               </form>
 
               <h6>Edit Existing Flight</h6>
-              <form method="post" action="{{ url_for('staff_edit_flight') }}" class="row g-2 mb-3">
+              <form method="post" action="{{ url_for('staff.staff_edit_flight') }}" class="row g-2 mb-3">
                 <div class="col-6"><input class="form-control" name="airline_name" value="{{ staff_data.airline_name }}" placeholder="Airline Code/Name" required></div>
                 <div class="col-6"><input class="form-control" name="flight_num" placeholder="Current Flight Number (required)" required></div>
                 <div class="col-6"><input class="form-control" name="new_flight_num" placeholder="New Flight Number (optional)"></div>
@@ -224,7 +224,7 @@
               </form>
 
               <h6>Authorize Booking Agent</h6>
-              <form method="post" action="{{ url_for('staff_authorize_agent') }}" class="row g-2">
+              <form method="post" action="{{ url_for('staff.staff_authorize_agent') }}" class="row g-2">
                 <div class="col-8"><input class="form-control" name="agent_email" type="email" placeholder="agent@email.com" required></div>
                 <div class="col-4"><button class="btn btn-sm btn-primary w-100" type="submit">Authorize</button></div>
               </form>
@@ -238,7 +238,7 @@
       <div class="card shadow-sm border-0 mb-4">
         <div class="card-body p-4">
           <h4 class="mb-3">Operator Actions - Update Flight Status</h4>
-          <form method="post" action="{{ url_for('staff_update_flight_status') }}" class="row g-3">
+          <form method="post" action="{{ url_for('staff.staff_update_flight_status') }}" class="row g-3">
             <div class="col-md-4"><input class="form-control" name="airline_name" value="{{ staff_data.airline_name }}" required></div>
             <div class="col-md-4"><input class="form-control" name="flight_num" placeholder="Flight Number" required></div>
             <div class="col-md-4">

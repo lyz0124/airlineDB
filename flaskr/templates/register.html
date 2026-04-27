@@ -17,7 +17,7 @@
                 <h2 class="mb-1">Create Account</h2>
                 <p class="text-muted mb-0">Air Ticket Reservation System</p>
               </div>
-              <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('login_page') }}">Login</a>
+              <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('auth.login_page') }}">Login</a>
             </div>
 
             {% with messages = get_flashed_messages() %}
@@ -30,7 +30,7 @@
               {% endif %}
             {% endwith %}
 
-            <form method="post" action="/register" class="row g-3">
+            <form method="post" action="{{ url_for('auth.register_page') }}" class="row g-3">
               <div class="col-md-6">
                 <label class="form-label">Role</label>
                 <select class="form-select" id="role" name="role" required>
