@@ -67,10 +67,10 @@ INSERT INTO `customer` (`email`, `name`, `password`, `building_number`, `street`
 -- 9. Populate 'flight'
 -- Dates are set for current/near future relative to typical database usage
 INSERT INTO `flight` (`airline_name`, `flight_num`, `departure_airport`, `departure_time`, `arrival_airport`, `arrival_time`, `price`, `status`, `airplane_id`) VALUES 
-('JetBlue', 50, 'JFK', '2024-05-01 08:00:00', 'SFO', '2024-05-01 11:30:00', 350.00, 'upcoming', 101),
-('China Eastern', 202, 'PVG', '2024-05-02 14:00:00', 'HND', '2024-05-02 17:00:00', 450.00, 'upcoming', 201),
-('Emirates', 1, 'DXB', '2024-05-03 23:30:00', 'LHR', '2024-05-04 04:30:00', 1200.00, 'upcoming', 401),
-('British Airways', 77, 'LHR', '2024-04-10 10:00:00', 'JFK', '2024-04-10 13:00:00', 800.00, 'delayed', 301);
+('JetBlue', 50, 'JFK', '2027-05-01 08:00:00', 'SFO', '2027-05-01 11:30:00', 350.00, 'upcoming', 101),
+('China Eastern', 202, 'PVG', '2027-05-02 14:00:00', 'HND', '2027-05-02 17:00:00', 450.00, 'upcoming', 201),
+('Emirates', 1, 'DXB', '2027-05-03 23:30:00', 'LHR', '2027-05-04 04:30:00', 1200.00, 'upcoming', 401),
+('British Airways', 77, 'LHR', '2027-04-10 10:00:00', 'JFK', '2027-04-10 13:00:00', 800.00, 'delayed', 301);
 
 -- 10. Populate 'ticket'
 INSERT INTO `ticket` (`ticket_id`, `airline_name`, `flight_num`) VALUES 
