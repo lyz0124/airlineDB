@@ -417,6 +417,22 @@ def public_search_flights():
             search_message_type="warning"
         )
 
+    if not (search_form["departure_airport"] or search_form["departure_city"]):
+        return render_public_page(
+            search_form=search_form,
+            search_submitted=True,
+            search_message="Please provide either a departure airport code or departure city.",
+            search_message_type="warning"
+        )
+
+    if not (search_form["arrival_airport"] or search_form["arrival_city"]):
+        return render_public_page(
+            search_form=search_form,
+            search_submitted=True,
+            search_message="Please provide either an arrival airport code or arrival city.",
+            search_message_type="warning"
+        )
+
     departure_date = search_form["departure_date"]
     if departure_date:
         try:
@@ -455,13 +471,14 @@ def public_search_flights():
             if search_form["departure_airport"]:
                 sql += " AND f.departure_airport = %s"
                 params.append(search_form["departure_airport"])
+            elif search_form["departure_city"]:
+                sql += " AND dep.airport_city = %s"
+                params.append(search_form["departure_city"])
+
             if search_form["arrival_airport"]:
                 sql += " AND f.arrival_airport = %s"
                 params.append(search_form["arrival_airport"])
-            if search_form["departure_city"]:
-                sql += " AND dep.airport_city = %s"
-                params.append(search_form["departure_city"])
-            if search_form["arrival_city"]:
+            elif search_form["arrival_city"]:
                 sql += " AND arr.airport_city = %s"
                 params.append(search_form["arrival_city"])
             if departure_date:
