@@ -144,44 +144,49 @@ def load_customer_dashboard(cur, customer_email, args):
     custom_total = 0.0
     custom_labels = []
     custom_amounts = []
+    custom_date_error = None
 
     if custom_start and custom_end:
-        cur.execute(
-            """
-            SELECT COALESCE(SUM(f.price), 0) AS total
-            FROM purchases p
-            JOIN ticket t ON t.ticket_id = p.ticket_id
-            JOIN flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
-            WHERE p.customer_email = %s
-              AND p.purchase_date BETWEEN %s AND %s
-            """,
-            (customer_email, custom_start, custom_end),
-        )
-        custom_total = float(cur.fetchone()["total"])
-
-        cur.execute(
-            """
-            SELECT DATE_FORMAT(p.purchase_date, '%%Y-%%m') AS month, COALESCE(SUM(f.price), 0) AS amount
-            FROM purchases p
-            JOIN ticket t ON t.ticket_id = p.ticket_id
-            JOIN flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
-            WHERE p.customer_email = %s
-              AND p.purchase_date BETWEEN %s AND %s
-            GROUP BY DATE_FORMAT(p.purchase_date, '%%Y-%%m')
-            ORDER BY month
-            """,
-            (customer_email, custom_start, custom_end),
-        )
-        custom_rows = cur.fetchall()
         try:
             parsed_custom_start = parse_date(custom_start)
             parsed_custom_end = parse_date(custom_end)
-            if parsed_custom_start <= parsed_custom_end:
+
+            if parsed_custom_start > parsed_custom_end:
+                custom_date_error = "Start date cannot be later than end date."
+            else:
+
+                cur.execute(
+                    """
+                    SELECT COALESCE(SUM(f.price), 0) AS total
+                    FROM purchases p
+                    JOIN ticket t ON t.ticket_id = p.ticket_id
+                    JOIN flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
+                    WHERE p.customer_email = %s
+                    AND p.purchase_date BETWEEN %s AND %s
+                    """,
+                    (customer_email, custom_start, custom_end),
+                )
+                custom_total = float(cur.fetchone()["total"])
+
+                cur.execute(
+                    """
+                    SELECT DATE_FORMAT(p.purchase_date, '%%Y-%%m') AS month, COALESCE(SUM(f.price), 0) AS amount
+                    FROM purchases p
+                    JOIN ticket t ON t.ticket_id = p.ticket_id
+                    JOIN flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
+                    WHERE p.customer_email = %s
+                        AND p.purchase_date BETWEEN %s AND %s
+                    GROUP BY DATE_FORMAT(p.purchase_date, '%%Y-%%m')
+                    ORDER BY month
+                    """,
+                    (customer_email, custom_start, custom_end),
+                )
+                custom_rows = cur.fetchall()
                 custom_labels = month_labels_between(parsed_custom_start, parsed_custom_end)
                 custom_amounts = fill_monthly_series(custom_rows, custom_labels, "amount")
+
         except ValueError:
-            custom_labels = []
-            custom_amounts = []
+            custom_date_error = "Invalid date format."
 
     return {
         "purchased_filters": purchased_filters,
@@ -198,6 +203,7 @@ def load_customer_dashboard(cur, customer_email, args):
             "custom_total": custom_total,
             "custom_labels": custom_labels,
             "custom_amounts": custom_amounts,
+            "custom_date_error": custom_date_error,
         },
     }
 
@@ -404,10 +410,11 @@ def load_staff_dashboard(cur, staff_user, args):
     cur.execute(flights_sql, tuple(flights_params))
     flights = cur.fetchall()
 
-    passenger_query_airline = args.get("passenger_airline_name", airline_name).strip()
+    # Always scope passenger lookup to this staff member's airline (ignore spoofed query params).
+    passenger_query_airline = airline_name
     passenger_query_flight = args.get("passenger_flight_num", "").strip()
     passengers = []
-    if passenger_query_flight:
+    if passenger_query_flight.isdigit():
         cur.execute(
             """
             SELECT
@@ -421,7 +428,7 @@ def load_staff_dashboard(cur, staff_user, args):
               AND t.flight_num = %s
             ORDER BY p.purchase_date DESC
             """,
-            (passenger_query_airline, passenger_query_flight),
+            (passenger_query_airline, int(passenger_query_flight)),
         )
         passengers = cur.fetchall()
 
@@ -453,8 +460,16 @@ def load_staff_dashboard(cur, staff_user, args):
     selected_year = args.get("staff_year", str(date.today().year)).strip()
     selected_month = args.get("staff_month", str(date.today().month)).strip()
 
+    rank_raw = args.get("staff_agent_rank_by", "tickets").strip().lower()
+    staff_agent_rank_by = rank_raw if rank_raw in ("tickets", "commission") else "tickets"
+    top_agents_order_by = (
+        "ticket_count DESC, commission_total DESC"
+        if staff_agent_rank_by == "tickets"
+        else "commission_total DESC, ticket_count DESC"
+    )
+
     cur.execute(
-        """
+        f"""
         SELECT
             p.booking_agent_email AS agent_email,
             COUNT(*) AS ticket_count,
@@ -467,7 +482,7 @@ def load_staff_dashboard(cur, staff_user, args):
           AND YEAR(p.purchase_date) = %s
           AND MONTH(p.purchase_date) = %s
         GROUP BY p.booking_agent_email
-        ORDER BY ticket_count DESC, commission_total DESC
+        ORDER BY {top_agents_order_by}
         LIMIT 5
         """,
         (airline_name, selected_year, selected_month),
@@ -574,6 +589,7 @@ def load_staff_dashboard(cur, staff_user, args):
         "customer_flights": customer_flights,
         "selected_year": selected_year,
         "selected_month": selected_month,
+        "staff_agent_rank_by": staff_agent_rank_by,
         "top_agents": top_agents,
         "most_frequent_customer": most_frequent_customer,
         "tickets_by_month_labels": yearly_labels,

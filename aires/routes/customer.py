@@ -14,7 +14,7 @@ def customer_purchase():
     airline_name = request.form.get("airline_name", "").strip()
     flight_num_text = request.form.get("flight_num", "").strip()
     if not airline_name or not flight_num_text.isdigit():
-        flash("Invalid airline or flight number.")
+        flash("Invalid airline or flight number.", "warning")
         return redirect(url_for("dashboard.dashboard", tab="customer-search"))
 
     conn = None
@@ -26,12 +26,12 @@ def customer_purchase():
                 conn.commit()
             else:
                 conn.rollback()
-            flash(message)
+            flash(message, "success" if success else "danger")
     except Exception as e:
         if conn:
             conn.rollback()
         print(f"[customer_purchase][error] {e}")
-        flash("Purchase failed. Please try again.")
+        flash("Purchase failed. Please try again.", "danger")
     finally:
         if conn:
             conn.close()

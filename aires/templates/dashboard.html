@@ -18,13 +18,12 @@
       </form>
     </div>
 
-    {% with messages = get_flashed_messages() %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        <div class="alert alert-info">
-          {% for msg in messages %}
-            <div>{{ msg }}</div>
-          {% endfor %}
-        </div>
+        {% for category, msg in messages %}
+          {% set alert_cls = {'success': 'success', 'danger': 'danger', 'warning': 'warning', 'info': 'info', 'message': 'info', 'primary': 'primary'}.get(category, 'info') %}
+          <div class="alert alert-{{ alert_cls }}" role="alert">{{ msg }}</div>
+        {% endfor %}
       {% endif %}
     {% endwith %}
 
@@ -32,6 +31,28 @@
       <div class="card shadow-sm border-0 mb-4">
         <div class="card-body p-4">
           <h4 class="mb-3">Customer - Purchased Flights</h4>
+          <form method="get" action="{{ url_for('dashboard.dashboard') }}" class="row g-3 mb-3">
+            <div class="col-md-3">
+              <input class="form-control" type="date" name="customer_start_date" 
+                     placeholder="Start Date" value="{{ customer_data.purchased_filters.start_date }}">
+            </div>
+            <div class="col-md-3">
+              <input class="form-control" type="date" name="customer_end_date" 
+                     placeholder="End Date" value="{{ customer_data.purchased_filters.end_date }}">
+            </div>
+            <div class="col-md-3">
+              <input class="form-control" type="text" name="customer_origin" 
+                     placeholder="Origin Airport" value="{{ customer_data.purchased_filters.origin }}">
+            </div>
+            <div class="col-md-3">
+              <input class="form-control" type="text" name="customer_destination" 
+                     placeholder="Destination Airport" value="{{ customer_data.purchased_filters.destination }}">
+            </div>
+            <div class="col-12">
+              <button class="btn btn-outline-primary" type="submit">Filter</button>
+              <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-outline-secondary">Clear</a>
+            </div>
+          </form>
           <div class="table-responsive">
             <table class="table table-sm align-middle">
               <thead><tr><th>Purchase Date</th><th>Ticket ID</th><th>Airline</th><th>Flight #</th><th>Route</th><th>Departure</th><th>Status</th><th>Price</th></tr></thead>
@@ -100,9 +121,26 @@
           <div class="row">
             <div class="col-md-6"><canvas id="customerLast6Chart"></canvas></div>
             <div class="col-md-6">
-              {% if customer_data.spending.custom_labels %}
+              <form method="get" action="{{ url_for('dashboard.dashboard') }}" class="mb-3">
+                <div class="row g-2">
+                  <div class="col-5">
+                    <input type="date" name="spending_start_date" value="...">
+                  </div>
+                  <div class="col-5">
+                    <input type="date" name="spending_end_date" value="...">
+                  </div>
+                  <div class="col-2">
+                    <button type="submit">Apply</button>
+                  </div>
+                </div>
+              </form>
+              {% if customer_data.spending.custom_date_error %}
+                <div class="alert alert-danger">{{ customer_data.spending.custom_date_error }}</div>
+              {% elif customer_data.spending.custom_labels %}
                 <p class="mb-2"><strong>Custom Total:</strong> {{ customer_data.spending.custom_total }}</p>
                 <canvas id="customerCustomChart"></canvas>
+              {% elif customer_data.spending.custom_start and customer_data.spending.custom_end %}
+                <p class="text-muted">No spending found in this date range.</p>
               {% else %}
                 <p class="text-muted">Select a custom date range to see chart.</p>
               {% endif %}
@@ -142,6 +180,100 @@
           </div>
         </div>
       </div>
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+          <h4 class="mb-3">Booking Agent - Flights Sold</h4>
+          <form method="get" action="{{ url_for('dashboard.dashboard') }}" class="row g-3 mb-3">
+            <div class="col-md-3">
+              <input class="form-control" type="date" name="agent_start_date" 
+                     value="{{ agent_data.flight_filters.start_date }}" placeholder="Start Date">
+            </div>
+            <div class="col-md-3">
+              <input class="form-control" type="date" name="agent_end_date" 
+                     value="{{ agent_data.flight_filters.end_date }}" placeholder="End Date">
+            </div>
+            <div class="col-md-3">
+              <input class="form-control" type="text" name="agent_origin" 
+                     value="{{ agent_data.flight_filters.origin }}" placeholder="Origin Airport">
+            </div>
+            <div class="col-md-3">
+              <input class="form-control" type="text" name="agent_destination" 
+                     value="{{ agent_data.flight_filters.destination }}" placeholder="Destination Airport">
+            </div>
+            <div class="col-12">
+              <button class="btn btn-outline-primary" type="submit">Filter</button>
+              <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-outline-secondary">Clear</a>
+            </div>
+          </form>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Purchase Date</th>
+                  <th>Customer Email</th>
+                  <th>Ticket ID</th>
+                  <th>Airline</th>
+                  <th>Flight #</th>
+                  <th>Route</th>
+                  <th>Departure Time</th>
+                  <th>Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in agent_data.purchased_rows %}
+                <tr>
+                  <td>{{ row.purchase_date }}</td>
+                  <td>{{ row.customer_email }}</td>
+                  <td>{{ row.ticket_id }}</td>
+                  <td>{{ row.airline_name }}</td>
+                  <td>{{ row.flight_num }}</td>
+                  <td>{{ row.departure_airport }} -> {{ row.arrival_airport }}</td>
+                  <td>{{ row.departure_time }}</td>
+                  <td>{{ row.price }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-muted">No tickets sold yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+          <h4 class="mb-3">Booking Agent - Analytics</h4>
+          <div class="row mb-4">
+            <div class="col-md-4">
+              <div class="border rounded p-3 text-center">
+                <div class="text-muted small">Commission (Last 30 Days)</div>
+                <div class="h4 mb-0">${{ "%.2f"|format(agent_data.commission_stats.commission_total) }}</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="border rounded p-3 text-center">
+                <div class="text-muted small">Avg Commission per Ticket</div>
+                <div class="h4 mb-0">${{ "%.2f"|format(agent_data.commission_stats.avg_commission) }}</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="border rounded p-3 text-center">
+                <div class="text-muted small">Tickets Sold (Last 30 Days)</div>
+                <div class="h4 mb-0">{{ agent_data.commission_stats.tickets_sold }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6">
+              <canvas id="agentTopTicketsChart"></canvas>
+            </div>
+            <div class="col-md-6">
+              <canvas id="agentTopCommissionChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    
     {% endif %}
 
     {% if role == "airline_staff" and staff_data %}
@@ -149,6 +281,33 @@
         <div class="card-body p-4">
           <h4 class="mb-3">Airline Staff - Flights</h4>
           <p class="text-muted">Airline: {{ staff_data.airline_name }} | Staff Role: {{ staff_data.staff_role }}</p>
+          <form method="get" action="{{ url_for('dashboard.dashboard') }}" class="row g-3 mb-3">
+            <input type="hidden" name="staff_agent_rank_by" value="{{ staff_data.staff_agent_rank_by }}">
+            <div class="col-md-3">
+              <label class="form-label small">Start Date</label>
+              <input class="form-control" type="date" name="staff_start_date" 
+                     value="{{ staff_data.flight_filters.start_date }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">End Date</label>
+              <input class="form-control" type="date" name="staff_end_date" 
+                     value="{{ staff_data.flight_filters.end_date }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Origin Airport</label>
+              <input class="form-control" type="text" name="staff_origin" 
+                     value="{{ staff_data.flight_filters.origin }}" placeholder="e.g., JFK">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label small">Destination Airport</label>
+              <input class="form-control" type="text" name="staff_destination" 
+                     value="{{ staff_data.flight_filters.destination }}" placeholder="e.g., PVG">
+            </div>
+            <div class="col-12">
+              <button class="btn btn-outline-primary" type="submit">Filter</button>
+              <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-outline-secondary">Clear</a>
+            </div>
+          </form>
           <div class="table-responsive">
             <table class="table table-sm align-middle">
               <thead><tr><th>Flight #</th><th>Route</th><th>Departure</th><th>Arrival</th><th>Status</th><th>Price</th></tr></thead>
@@ -161,6 +320,95 @@
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+          <h4 class="mb-3">Airline Staff — Passenger List by Flight</h4>
+          <p class="text-muted small mb-3">Shows customers who purchased a ticket on your airline for the given flight number ({{ staff_data.airline_name }}).</p>
+          <form method="get" action="{{ url_for('dashboard.dashboard') }}" class="row g-3 align-items-end mb-3">
+            <input type="hidden" name="staff_start_date" value="{{ staff_data.flight_filters.start_date }}">
+            <input type="hidden" name="staff_end_date" value="{{ staff_data.flight_filters.end_date }}">
+            <input type="hidden" name="staff_origin" value="{{ staff_data.flight_filters.origin }}">
+            <input type="hidden" name="staff_destination" value="{{ staff_data.flight_filters.destination }}">
+            <input type="hidden" name="staff_agent_rank_by" value="{{ staff_data.staff_agent_rank_by }}">
+            {% if staff_data.staff_customer_email %}
+            <input type="hidden" name="staff_customer_email" value="{{ staff_data.staff_customer_email }}">
+            {% endif %}
+            <div class="col-md-4">
+              <label class="form-label small">Flight number</label>
+              <input class="form-control" type="number" min="1" name="passenger_flight_num"
+                     value="{{ staff_data.passenger_query_flight }}" placeholder="e.g., 1003" required>
+            </div>
+            <div class="col-md-4">
+              <button class="btn btn-primary" type="submit">Load passengers</button>
+            </div>
+          </form>
+          {% if staff_data.passenger_query_flight %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>Customer email</th><th>Name</th><th>Purchase date</th></tr></thead>
+              <tbody>
+                {% for row in staff_data.passengers %}
+                  <tr><td>{{ row.email }}</td><td>{{ row.name }}</td><td>{{ row.purchase_date }}</td></tr>
+                {% else %}
+                  <tr><td colspan="3" class="text-muted">No ticket purchases found for this flight on {{ staff_data.airline_name }}.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-muted mb-0">Enter a flight number and click Load passengers.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+          <h4 class="mb-3">Airline Staff — Customer Trips on {{ staff_data.airline_name }}</h4>
+          <p class="text-muted small mb-3">All flights this customer has taken with your airline (by purchased ticket).</p>
+          <form method="get" action="{{ url_for('dashboard.dashboard') }}" class="row g-3 align-items-end mb-3">
+            <input type="hidden" name="staff_start_date" value="{{ staff_data.flight_filters.start_date }}">
+            <input type="hidden" name="staff_end_date" value="{{ staff_data.flight_filters.end_date }}">
+            <input type="hidden" name="staff_origin" value="{{ staff_data.flight_filters.origin }}">
+            <input type="hidden" name="staff_destination" value="{{ staff_data.flight_filters.destination }}">
+            <input type="hidden" name="staff_agent_rank_by" value="{{ staff_data.staff_agent_rank_by }}">
+            {% if staff_data.passenger_query_flight %}
+            <input type="hidden" name="passenger_flight_num" value="{{ staff_data.passenger_query_flight }}">
+            {% endif %}
+            <div class="col-md-6">
+              <label class="form-label small">Customer email</label>
+              <input class="form-control" type="email" name="staff_customer_email"
+                     value="{{ staff_data.staff_customer_email }}" placeholder="customer@example.com" required>
+            </div>
+            <div class="col-md-4">
+              <button class="btn btn-primary" type="submit">Search trips</button>
+            </div>
+          </form>
+          {% if staff_data.staff_customer_email %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>Purchase date</th><th>Flight #</th><th>Route</th><th>Departure</th><th>Arrival</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for row in staff_data.customer_flights %}
+                  <tr>
+                    <td>{{ row.purchase_date }}</td>
+                    <td>{{ row.flight_num }}</td>
+                    <td>{{ row.departure_airport }} → {{ row.arrival_airport }}</td>
+                    <td>{{ row.departure_time }}</td>
+                    <td>{{ row.arrival_time }}</td>
+                    <td>{{ row.status }}</td>
+                  </tr>
+                {% else %}
+                  <tr><td colspan="6" class="text-muted">No trips found for this customer on {{ staff_data.airline_name }}, or customer email does not exist.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-muted mb-0">Enter a customer email and click Search trips.</p>
+          {% endif %}
         </div>
       </div>
 
@@ -264,6 +512,114 @@
         </div>
       </div>
       {% endif %}
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+          <h4 class="mb-3">Airline Staff - Analytics</h4>
+          
+          <form method="get" action="{{ url_for('dashboard.dashboard') }}" class="row g-3 mb-4">
+            <div class="col-md-2">
+              <label class="form-label small">Year</label>
+              <select class="form-select" name="staff_year">
+                {% for y in [2023, 2024, 2025, 2026] %}
+                  <option value="{{ y }}" {% if staff_data.selected_year|int == y %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label small">Month</label>
+              <select class="form-select" name="staff_month">
+                {% for m in range(1, 13) %}
+                  <option value="{{ m }}" {% if staff_data.selected_month|int == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small">Rank top agents by</label>
+              <select class="form-select" name="staff_agent_rank_by">
+                <option value="tickets" {% if staff_data.staff_agent_rank_by == 'tickets' %}selected{% endif %}>Tickets sold (primary)</option>
+                <option value="commission" {% if staff_data.staff_agent_rank_by == 'commission' %}selected{% endif %}>Commission (primary)</option>
+              </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button class="btn btn-primary w-100" type="submit">Apply</button>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-outline-secondary w-100">Clear</a>
+            </div>
+          </form>
+
+          <h5 class="mb-3">Top 5 Booking Agents ({{ staff_data.selected_year }}-{{ staff_data.selected_month }}, ranked by {{ 'commission' if staff_data.staff_agent_rank_by == 'commission' else 'tickets' }})</h5>
+          <div class="table-responsive mb-4">
+            <table class="table table-sm">
+              <thead>
+                <tr><th>Agent Email</th><th>Tickets Sold</th><th>Total Commission</th></tr>
+              </thead>
+              <tbody>
+                {% for agent in staff_data.top_agents %}
+                <tr><td>{{ agent.agent_email }}</td><td>{{ agent.ticket_count }}</td><td>${{ "%.2f"|format(agent.commission_total) }}</td></tr>
+                {% else %}
+                <tr><td colspan="3" class="text-muted">No data available for this period.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="row mb-4">
+            <div class="col-md-4">
+              <div class="border rounded p-3 text-center">
+                <div class="text-muted small">Most Frequent Customer (Last Year)</div>
+                {% if staff_data.most_frequent_customer %}
+                  <div class="h6 mb-0">{{ staff_data.most_frequent_customer.customer_email }}</div>
+                  <div class="small">Tickets: {{ staff_data.most_frequent_customer.ticket_count }}</div>
+                {% else %}
+                  <div class="text-muted">No data</div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-md-8">
+              <h5 class="mb-3">Tickets Sold per Month (Last 12 Months)</h5>
+              <canvas id="staffTicketsPerMonthChart"></canvas>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-5">
+              <h5 class="mb-3">Delay vs On-Time (Last Year)</h5>
+              <canvas id="staffDelayChart"></canvas>
+            </div>
+            <div class="col-md-7">
+              <div class="row">
+                <div class="col-md-6">
+                  <h5 class="mb-3">Top Destinations (Last 3 Months)</h5>
+                  <ul class="list-group">
+                    {% for dest in staff_data.top_destinations_3m %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      {{ dest.arrival_airport }} ({{ dest.airport_city }})
+                      <span class="badge bg-primary rounded-pill">{{ dest.flight_count }} flights</span>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item text-muted">No data</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                <div class="col-md-6">
+                  <h5 class="mb-3">Top Destinations (Last Year)</h5>
+                  <ul class="list-group">
+                    {% for dest in staff_data.top_destinations_1y %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      {{ dest.arrival_airport }} ({{ dest.airport_city }})
+                      <span class="badge bg-primary rounded-pill">{{ dest.flight_count }} flights</span>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item text-muted">No data</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     {% endif %}
   </div>
 
@@ -274,6 +630,12 @@
     data-customer-six-month-amounts='{{ (customer_data.spending.six_month_amounts if customer_data else []) | tojson }}'
     data-customer-custom-labels='{{ (customer_data.spending.custom_labels if customer_data else []) | tojson }}'
     data-customer-custom-amounts='{{ (customer_data.spending.custom_amounts if customer_data else []) | tojson }}'
+    data-agent-top-tickets-labels='{{ (agent_data.top_tickets_labels if agent_data else []) | tojson }}'
+    data-agent-top-tickets-values='{{ (agent_data.top_tickets_values if agent_data else []) | tojson }}'
+    data-agent-top-commission-labels='{{ (agent_data.top_commission_labels if agent_data else []) | tojson }}'
+    data-agent-top-commission-values='{{ (agent_data.top_commission_values if agent_data else []) | tojson }}'
+    data-staff-tickets-month-labels='{{ (staff_data.tickets_by_month_labels if staff_data else []) | tojson }}'
+    data-staff-tickets-month-values='{{ (staff_data.tickets_by_month_values if staff_data else []) | tojson }}'
     hidden
   ></div>
 
@@ -285,6 +647,12 @@
     const customerSixMonthAmounts = chartDataNode ? JSON.parse(chartDataNode.dataset.customerSixMonthAmounts || "[]") : [];
     const customerCustomLabels = chartDataNode ? JSON.parse(chartDataNode.dataset.customerCustomLabels || "[]") : [];
     const customerCustomAmounts = chartDataNode ? JSON.parse(chartDataNode.dataset.customerCustomAmounts || "[]") : [];
+    const agentTopTicketsLabels = chartDataNode ? JSON.parse(chartDataNode.dataset.agentTopTicketsLabels || "[]") : [];
+    const agentTopTicketsValues = chartDataNode ? JSON.parse(chartDataNode.dataset.agentTopTicketsValues || "[]") : [];
+    const agentTopCommissionLabels = chartDataNode ? JSON.parse(chartDataNode.dataset.agentTopCommissionLabels || "[]") : [];
+    const agentTopCommissionValues = chartDataNode ? JSON.parse(chartDataNode.dataset.agentTopCommissionValues || "[]") : [];
+    const staffTicketsMonthLabels = chartDataNode ? JSON.parse(chartDataNode.dataset.staffTicketsMonthLabels || "[]") : [];
+    const staffTicketsMonthValues = chartDataNode ? JSON.parse(chartDataNode.dataset.staffTicketsMonthValues || "[]") : [];
 
     if (chartRole === "customer") {
       const customerLast6Canvas = document.getElementById("customerLast6Chart");
@@ -299,6 +667,54 @@
         new Chart(customerCustomCanvas, {
           type: "bar",
           data: { labels: customerCustomLabels, datasets: [{ label: "Custom Range Spending", data: customerCustomAmounts }] }
+        }); 
+      }  
+    }
+    if (chartRole === "booking_agent") {
+      const topTicketsLabels = agentTopTicketsLabels;
+      const topTicketsValues = agentTopTicketsValues;
+      const topCommissionLabels = agentTopCommissionLabels;
+      const topCommissionValues = agentTopCommissionValues;
+
+      const topTicketsCanvas = document.getElementById("agentTopTicketsChart");
+      if (topTicketsCanvas && topTicketsLabels.length > 0) {
+        new Chart(topTicketsCanvas, {
+          type: "bar",
+          data: {
+            labels: topTicketsLabels,
+            datasets: [{ label: "Tickets Purchased (Last 6 Months)", data: topTicketsValues }]
+          }
+        });
+      }
+
+      const topCommissionCanvas = document.getElementById("agentTopCommissionChart");
+      if (topCommissionCanvas && topCommissionLabels.length > 0) {
+        new Chart(topCommissionCanvas, {
+          type: "bar",
+          data: {
+            labels: topCommissionLabels,
+            datasets: [{ label: "Commission (Last Year)", data: topCommissionValues }]
+          }
+        });
+      }
+    }
+    if (chartRole === "airline_staff") {
+      const staffTicketsCanvas = document.getElementById("staffTicketsPerMonthChart");
+      if (staffTicketsCanvas && staffTicketsMonthLabels.length > 0) {
+        new Chart(staffTicketsCanvas, {
+          type: "bar",
+          data: {
+            labels: staffTicketsMonthLabels,
+            datasets: [{
+              label: "Tickets sold",
+              data: staffTicketsMonthValues,
+            }],
+          },
+          options: {
+            scales: {
+              y: { beginAtZero: true, ticks: { precision: 0 } },
+            },
+          },
         });
       }
     }

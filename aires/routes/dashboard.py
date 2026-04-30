@@ -40,7 +40,7 @@ def dashboard():
                 context["staff_data"] = load_staff_dashboard(cur, user_id, request.args)
     except Exception as e:
         print(f"[dashboard][error] {e}")
-        flash("Failed to load dashboard data.")
+        flash("Failed to load dashboard data.", "danger")
     finally:
         if conn:
             conn.close()

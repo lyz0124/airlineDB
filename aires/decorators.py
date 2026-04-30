@@ -8,10 +8,10 @@ def role_required(role=None):
         @wraps(view)
         def wrapped_view(*args, **kwargs):
             if "user_role" not in session:
-                flash("Please login first.")
+                flash("Please login first.", "warning")
                 return redirect(url_for("auth.login_page"))
             if role and session.get("user_role") != role:
-                flash("Permission denied.")
+                flash("Permission denied.", "danger")
                 return redirect(url_for("dashboard.dashboard"))
             return view(*args, **kwargs)
 

@@ -15,7 +15,7 @@ def agent_purchase():
     airline_name = request.form.get("airline_name", "").strip()
     flight_num_text = request.form.get("flight_num", "").strip()
     if not customer_email or not airline_name or not flight_num_text.isdigit():
-        flash("Customer, airline, and numeric flight number are required.")
+        flash("Customer, airline, and numeric flight number are required.", "warning")
         return redirect(url_for("dashboard.dashboard", tab="agent-search"))
 
     conn = None
@@ -23,7 +23,7 @@ def agent_purchase():
         conn = get_conn()
         with conn.cursor() as cur:
             if not is_agent_authorized(cur, agent_email, airline_name):
-                flash("You are not authorized to sell tickets for this airline.")
+                flash("You are not authorized to sell tickets for this airline.", "danger")
                 return redirect(url_for("dashboard.dashboard", tab="agent-search"))
 
             success, message = create_purchase(
@@ -37,12 +37,12 @@ def agent_purchase():
                 conn.commit()
             else:
                 conn.rollback()
-            flash(message)
+            flash(message, "success" if success else "danger")
     except Exception as e:
         if conn:
             conn.rollback()
         print(f"[agent_purchase][error] {e}")
-        flash("Purchase failed. Please try again.")
+        flash("Purchase failed. Please try again.", "danger")
     finally:
         if conn:
             conn.close()
