@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from aires.services.common import staff_has_permission
+from aires.services.common import add_location_filter, resolve_airport_code, staff_has_permission
 from aires.services.public_service import validate_public_search
 from aires.services.purchase_service import create_purchase
 from aires.services.staff_service import build_flight_update_payload
@@ -22,6 +22,24 @@ class PurchaseCursor:
             self._next_result = {"1": 1} if self.customer_exists else None
         elif "MAX(ticket_id)" in sql:
             self._next_result = {"next_id": self.next_ticket_id}
+        else:
+            self._next_result = None
+
+    def fetchone(self):
+        return self._next_result
+
+
+class LocationCursor:
+    def __init__(self):
+        self.executed = []
+        self.airports = {"jfk": "JFK", "nrt": "NRT", "pvg": "PVG", "sha": "SHA"}
+        self._next_result = None
+
+    def execute(self, sql, params=None):
+        self.executed.append((sql, params))
+        if "FROM airport" in sql and params:
+            airport = self.airports.get(params[0].casefold())
+            self._next_result = {"airport_name": airport} if airport else None
         else:
             self._next_result = None
 
@@ -61,6 +79,32 @@ def test_staff_has_permission_allows_both_roles():
     assert staff_has_permission("both", "admin") is True
     assert staff_has_permission("both", "operator") is True
     assert staff_has_permission("operator", "admin") is False
+
+
+def test_resolve_airport_code_accepts_case_insensitive_airport_code():
+    cursor = LocationCursor()
+
+    assert resolve_airport_code(cursor, "pvg") == "PVG"
+
+
+def test_add_location_filter_prefers_airport_code_over_city_fallback():
+    cursor = LocationCursor()
+    params = []
+
+    sql = add_location_filter(cursor, "SELECT * FROM flight WHERE 1 = 1", params, "departure_airport", "airport_city", "sha")
+
+    assert "departure_airport = %s" in sql
+    assert params == ["SHA"]
+
+
+def test_add_location_filter_falls_back_to_case_insensitive_city_contains():
+    cursor = LocationCursor()
+    params = []
+
+    sql = add_location_filter(cursor, "SELECT * FROM flight WHERE 1 = 1", params, "departure_airport", "airport_city", "York")
+
+    assert "LOWER(airport_city) LIKE %s" in sql
+    assert params == ["%york%"]
 
 
 def test_build_flight_update_payload_merges_existing_values():

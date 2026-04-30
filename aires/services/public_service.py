@@ -1,15 +1,19 @@
 from datetime import datetime
 
+from .common import add_location_filter
+
 
 def validate_public_search(search_form):
     if not any(search_form.values()):
         return "Please provide at least one search condition."
-    if not (search_form["departure_airport"] or search_form["departure_city"]):
+    departure_location = search_form.get("departure_location") or search_form.get("departure_airport") or search_form.get("departure_city")
+    arrival_location = search_form.get("arrival_location") or search_form.get("arrival_airport") or search_form.get("arrival_city")
+    if not departure_location:
         return "Please provide either a departure airport code or departure city."
-    if not (search_form["arrival_airport"] or search_form["arrival_city"]):
+    if not arrival_location:
         return "Please provide either an arrival airport code or arrival city."
 
-    departure_date = search_form["departure_date"]
+    departure_date = search_form.get("departure_date", "")
     if departure_date:
         try:
             datetime.strptime(departure_date, "%Y-%m-%d")
@@ -38,19 +42,10 @@ def search_public_flights(cur, search_form):
     """
     params = []
 
-    if search_form["departure_airport"]:
-        sql += " AND f.departure_airport = %s"
-        params.append(search_form["departure_airport"])
-    elif search_form["departure_city"]:
-        sql += " AND dep.airport_city = %s"
-        params.append(search_form["departure_city"])
-
-    if search_form["arrival_airport"]:
-        sql += " AND f.arrival_airport = %s"
-        params.append(search_form["arrival_airport"])
-    elif search_form["arrival_city"]:
-        sql += " AND arr.airport_city = %s"
-        params.append(search_form["arrival_city"])
+    departure_location = search_form.get("departure_location") or search_form.get("departure_airport") or search_form.get("departure_city")
+    arrival_location = search_form.get("arrival_location") or search_form.get("arrival_airport") or search_form.get("arrival_city")
+    sql = add_location_filter(cur, sql, params, "f.departure_airport", "dep.airport_city", departure_location)
+    sql = add_location_filter(cur, sql, params, "f.arrival_airport", "arr.airport_city", arrival_location)
 
     if search_form["departure_date"]:
         sql += " AND DATE(f.departure_time) = %s"

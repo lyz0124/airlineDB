@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from ..services.common import get_staff_profile
+from ..services.common import add_location_filter, get_location_options, get_staff_profile
 from ..utils import fill_monthly_series, month_labels_between, parse_date
 
 
@@ -43,18 +43,21 @@ def load_customer_dashboard(cur, customer_email, args):
     if purchased_filters["destination"]:
         purchased_sql += " AND f.arrival_airport = %s"
         purchased_params.append(purchased_filters["destination"])
-    if not purchased_filters["start_date"] and not purchased_filters["end_date"]:
-        purchased_sql += " AND f.departure_time >= NOW()"
-
     purchased_sql += " ORDER BY f.departure_time ASC"
     cur.execute(purchased_sql, tuple(purchased_params))
     purchased_flights = cur.fetchall()
 
     search_filters = {
-        "departure_airport": args.get("search_departure_airport", "").strip(),
-        "arrival_airport": args.get("search_arrival_airport", "").strip(),
-        "departure_city": args.get("search_departure_city", "").strip(),
-        "arrival_city": args.get("search_arrival_city", "").strip(),
+        "departure_location": (
+            args.get("search_departure_location", "").strip()
+            or args.get("search_departure_airport", "").strip()
+            or args.get("search_departure_city", "").strip()
+        ),
+        "arrival_location": (
+            args.get("search_arrival_location", "").strip()
+            or args.get("search_arrival_airport", "").strip()
+            or args.get("search_arrival_city", "").strip()
+        ),
         "departure_date": args.get("search_departure_date", "").strip(),
     }
 
@@ -82,18 +85,12 @@ def load_customer_dashboard(cur, customer_email, args):
     """
     search_params = []
 
-    if search_filters["departure_airport"]:
-        search_sql += " AND f.departure_airport = %s"
-        search_params.append(search_filters["departure_airport"])
-    if search_filters["arrival_airport"]:
-        search_sql += " AND f.arrival_airport = %s"
-        search_params.append(search_filters["arrival_airport"])
-    if search_filters["departure_city"]:
-        search_sql += " AND dep.airport_city = %s"
-        search_params.append(search_filters["departure_city"])
-    if search_filters["arrival_city"]:
-        search_sql += " AND arr.airport_city = %s"
-        search_params.append(search_filters["arrival_city"])
+    search_sql = add_location_filter(
+        cur, search_sql, search_params, "f.departure_airport", "dep.airport_city", search_filters["departure_location"]
+    )
+    search_sql = add_location_filter(
+        cur, search_sql, search_params, "f.arrival_airport", "arr.airport_city", search_filters["arrival_location"]
+    )
     if search_filters["departure_date"]:
         search_sql += " AND DATE(f.departure_time) = %s"
         search_params.append(search_filters["departure_date"])
@@ -191,6 +188,7 @@ def load_customer_dashboard(cur, customer_email, args):
         "purchased_flights": purchased_flights,
         "search_filters": search_filters,
         "search_results": search_results,
+        "location_options": get_location_options(cur),
         "spending": {
             "total_12m": total_12m,
             "six_month_labels": six_month_labels,
@@ -360,6 +358,7 @@ def load_agent_dashboard(cur, agent_email, args):
         "top_tickets_values": [int(row["ticket_count"]) for row in top_tickets],
         "top_commission_labels": [row["customer_email"] for row in top_commission],
         "top_commission_values": [float(row["commission"]) for row in top_commission],
+        "location_options": get_location_options(cur),
     }
 
 
@@ -567,6 +566,7 @@ def load_staff_dashboard(cur, staff_user, args):
         "airline_name": airline_name,
         "flight_filters": flight_filters,
         "flights": flights,
+        "location_options": get_location_options(cur),
         "passenger_query_airline": passenger_query_airline,
         "passenger_query_flight": passenger_query_flight,
         "passengers": passengers,

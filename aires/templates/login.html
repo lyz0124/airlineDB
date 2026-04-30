@@ -61,20 +61,12 @@
             <h4 class="mb-3">Public Search: Upcoming Flights</h4>
             <form method="post" action="{{ url_for('public.public_search_flights') }}" class="row g-3">
               <div class="col-md-6">
-                <label class="form-label">Departure Airport</label>
-                <input class="form-control" type="text" name="departure_airport" value="{{ (search_form or {}).get('departure_airport', '') }}">
+                <label class="form-label">Departure Airport or City</label>
+                <input class="form-control" type="search" name="departure_location" list="public-location-options" value="{{ (search_form or {}).get('departure_location', '') }}">
               </div>
               <div class="col-md-6">
-                <label class="form-label">Arrival Airport</label>
-                <input class="form-control" type="text" name="arrival_airport" value="{{ (search_form or {}).get('arrival_airport', '') }}">
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">Departure City</label>
-                <input class="form-control" type="text" name="departure_city" value="{{ (search_form or {}).get('departure_city', '') }}">
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">Arrival City</label>
-                <input class="form-control" type="text" name="arrival_city" value="{{ (search_form or {}).get('arrival_city', '') }}">
+                <label class="form-label">Arrival Airport or City</label>
+                <input class="form-control" type="search" name="arrival_location" list="public-location-options" value="{{ (search_form or {}).get('arrival_location', '') }}">
               </div>
               <div class="col-md-6">
                 <label class="form-label">Departure Date</label>
@@ -83,6 +75,14 @@
               <div class="col-12">
                 <button class="btn btn-outline-primary" type="submit">Search Flights</button>
               </div>
+              <datalist id="public-location-options">
+                {% for airport in (location_options or {}).get('airports', []) %}
+                  <option value="{{ airport.airport_name }}">{{ airport.airport_name }} - {{ airport.airport_city }}</option>
+                {% endfor %}
+                {% for city in (location_options or {}).get('cities', []) %}
+                  <option value="{{ city.city_name }}">{{ city.city_name }}</option>
+                {% endfor %}
+              </datalist>
             </form>
 
             {% if search_submitted %}

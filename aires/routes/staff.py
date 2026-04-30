@@ -6,7 +6,7 @@ import pymysql
 
 from ..decorators import role_required
 from ..db import get_conn
-from ..services.common import get_staff_profile, staff_has_permission
+from ..services.common import get_staff_profile, resolve_airport_code, staff_has_permission
 from ..services.staff_service import build_flight_update_payload
 
 bp = Blueprint("staff", __name__, url_prefix="/staff")
@@ -135,6 +135,12 @@ def staff_create_flight():
                 flash("Admin permission required.")
                 return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
 
+            departure_airport_code = resolve_airport_code(cur, departure_airport)
+            arrival_airport_code = resolve_airport_code(cur, arrival_airport)
+            if not departure_airport_code or not arrival_airport_code:
+                flash("Departure and arrival airports must be existing airport codes.")
+                return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+
             cur.execute(
                 """
                 INSERT INTO flight
@@ -145,9 +151,9 @@ def staff_create_flight():
                 (
                     profile["airline_name"],
                     int(flight_num_text),
-                    departure_airport,
+                    departure_airport_code,
                     dep_dt,
-                    arrival_airport,
+                    arrival_airport_code,
                     arr_dt,
                     price_value,
                     status,
@@ -226,6 +232,14 @@ def staff_edit_flight():
             if error_message:
                 flash(error_message)
                 return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+
+            departure_airport_code = resolve_airport_code(cur, update_payload["departure_airport"])
+            arrival_airport_code = resolve_airport_code(cur, update_payload["arrival_airport"])
+            if not departure_airport_code or not arrival_airport_code:
+                flash("Departure and arrival airports must be existing airport codes.")
+                return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+            update_payload["departure_airport"] = departure_airport_code
+            update_payload["arrival_airport"] = arrival_airport_code
 
             cur.execute(
                 """

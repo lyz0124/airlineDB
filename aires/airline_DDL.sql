@@ -131,7 +131,7 @@ FOREIGN KEY(`customer_email`) REFERENCES `customer`(`email`)
 
 -- --------------------------------------------------------
 --
--- Challenge: Multi-airport cities and aliases
+-- Challenge: Multi-airport cities
 --
 -- new table city
 CREATE TABLE `city` (

@@ -4,7 +4,7 @@ import pymysql
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",
-    "password": "example",
+    "password": "",
     "database": "air_reservation",
     "cursorclass": pymysql.cursors.DictCursor,
     "autocommit": False,

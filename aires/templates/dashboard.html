@@ -54,12 +54,18 @@
         <div class="card-body p-4">
           <h4 class="mb-3">Customer - Search Flights and Purchase</h4>
           <form method="get" action="{{ url_for('dashboard.dashboard') }}" class="row g-3 mb-3">
-            <div class="col-md-4"><input class="form-control" type="text" name="search_departure_airport" placeholder="Departure Airport" value="{{ customer_data.search_filters.departure_airport }}"></div>
-            <div class="col-md-4"><input class="form-control" type="text" name="search_arrival_airport" placeholder="Arrival Airport" value="{{ customer_data.search_filters.arrival_airport }}"></div>
+            <div class="col-md-4"><input class="form-control" type="search" name="search_departure_location" list="customer-location-options" placeholder="Departure airport or city" value="{{ customer_data.search_filters.departure_location }}"></div>
+            <div class="col-md-4"><input class="form-control" type="search" name="search_arrival_location" list="customer-location-options" placeholder="Arrival airport or city" value="{{ customer_data.search_filters.arrival_location }}"></div>
             <div class="col-md-4"><input class="form-control" type="date" name="search_departure_date" value="{{ customer_data.search_filters.departure_date }}"></div>
-            <div class="col-md-4"><input class="form-control" type="text" name="search_departure_city" placeholder="Departure City" value="{{ customer_data.search_filters.departure_city }}"></div>
-            <div class="col-md-4"><input class="form-control" type="text" name="search_arrival_city" placeholder="Arrival City" value="{{ customer_data.search_filters.arrival_city }}"></div>
             <div class="col-12"><button class="btn btn-outline-primary" type="submit">Search</button></div>
+            <datalist id="customer-location-options">
+              {% for airport in customer_data.location_options.airports %}
+                <option value="{{ airport.airport_name }}">{{ airport.airport_name }} - {{ airport.airport_city }}</option>
+              {% endfor %}
+              {% for city in customer_data.location_options.cities %}
+                <option value="{{ city.city_name }}">{{ city.city_name }}</option>
+              {% endfor %}
+            </datalist>
           </form>
 
           <div class="table-responsive">
@@ -184,8 +190,8 @@
               <form method="post" action="{{ url_for('staff.staff_create_flight') }}" class="row g-2 mb-3">
                 <div class="col-6"><input class="form-control" name="flight_num" placeholder="Flight Number" required></div>
                 <div class="col-6"><input class="form-control" name="airplane_id" placeholder="Airplane ID" required></div>
-                <div class="col-6"><input class="form-control" name="departure_airport" placeholder="Departure Airport" required></div>
-                <div class="col-6"><input class="form-control" name="arrival_airport" placeholder="Arrival Airport" required></div>
+                <div class="col-6"><input class="form-control" type="search" name="departure_airport" list="staff-airport-options" placeholder="Departure Airport" required></div>
+                <div class="col-6"><input class="form-control" type="search" name="arrival_airport" list="staff-airport-options" placeholder="Arrival Airport" required></div>
                 <div class="col-6"><input class="form-control" type="datetime-local" name="departure_time" required></div>
                 <div class="col-6"><input class="form-control" type="datetime-local" name="arrival_time" required></div>
                 <div class="col-6"><input class="form-control" name="price" placeholder="Price" required></div>
@@ -205,8 +211,8 @@
                 <div class="col-6"><input class="form-control" name="flight_num" placeholder="Current Flight Number (required)" required></div>
                 <div class="col-6"><input class="form-control" name="new_flight_num" placeholder="New Flight Number (optional)"></div>
                 <div class="col-6"><input class="form-control" name="airplane_id" placeholder="New Airplane ID (optional integer)"></div>
-                <div class="col-6"><input class="form-control" name="departure_airport" placeholder="New Departure Airport (optional)"></div>
-                <div class="col-6"><input class="form-control" name="arrival_airport" placeholder="New Arrival Airport (optional)"></div>
+                <div class="col-6"><input class="form-control" type="search" name="departure_airport" list="staff-airport-options" placeholder="New Departure Airport (optional)"></div>
+                <div class="col-6"><input class="form-control" type="search" name="arrival_airport" list="staff-airport-options" placeholder="New Arrival Airport (optional)"></div>
                 <div class="col-6"><input class="form-control" type="datetime-local" name="departure_time" placeholder="New Departure Time (optional)"></div>
                 <div class="col-6"><input class="form-control" type="datetime-local" name="arrival_time" placeholder="New Arrival Time (optional)"></div>
                 <div class="col-6"><input class="form-control" name="price" placeholder="New Price (optional)"></div>
@@ -228,6 +234,11 @@
                 <div class="col-8"><input class="form-control" name="agent_email" type="email" placeholder="agent@email.com" required></div>
                 <div class="col-4"><button class="btn btn-sm btn-primary w-100" type="submit">Authorize</button></div>
               </form>
+              <datalist id="staff-airport-options">
+                {% for airport in staff_data.location_options.airports %}
+                  <option value="{{ airport.airport_name }}">{{ airport.airport_name }} - {{ airport.airport_city }}</option>
+                {% endfor %}
+              </datalist>
             </div>
           </div>
         </div>

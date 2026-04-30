@@ -3,6 +3,7 @@ from flask import Blueprint, render_template, request
 import pymysql
 
 from ..db import get_conn
+from ..services.common import get_location_options
 from ..services.public_service import (
     get_public_flight_status,
     search_public_flights,
@@ -13,6 +14,20 @@ bp = Blueprint("public", __name__, url_prefix="/public")
 
 
 def render_public_page(**context):
+    location_options = context.get("location_options")
+    if location_options is None:
+        location_options = {"airports": [], "cities": []}
+        conn = None
+        try:
+            conn = get_conn()
+            with conn.cursor() as cur:
+                location_options = get_location_options(cur)
+        except Exception as e:
+            print(f"[render_public_page][location_options_error] {e}")
+        finally:
+            if conn:
+                conn.close()
+
     return render_template(
         "login.html",
         search_form=context.get("search_form", {}),
@@ -20,6 +35,7 @@ def render_public_page(**context):
         search_submitted=context.get("search_submitted", False),
         search_message=context.get("search_message"),
         search_message_type=context.get("search_message_type", "info"),
+        location_options=location_options,
         status_form=context.get("status_form", {}),
         status_result=context.get("status_result"),
         status_submitted=context.get("status_submitted", False),
@@ -30,11 +46,15 @@ def render_public_page(**context):
 
 @bp.route("/search-flights", methods=["POST"])
 def public_search_flights():
+    departure_location = request.form.get("departure_location", "").strip()
+    arrival_location = request.form.get("arrival_location", "").strip()
     search_form = {
-        "departure_airport": request.form.get("departure_airport", "").strip(),
-        "arrival_airport": request.form.get("arrival_airport", "").strip(),
-        "departure_city": request.form.get("departure_city", "").strip(),
-        "arrival_city": request.form.get("arrival_city", "").strip(),
+        "departure_location": departure_location
+        or request.form.get("departure_airport", "").strip()
+        or request.form.get("departure_city", "").strip(),
+        "arrival_location": arrival_location
+        or request.form.get("arrival_airport", "").strip()
+        or request.form.get("arrival_city", "").strip(),
         "departure_date": request.form.get("departure_date", "").strip(),
     }
 
