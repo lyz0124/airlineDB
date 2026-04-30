@@ -27,10 +27,10 @@ def register_page():
     name = request.form.get("name", "").strip()
 
     if role not in {"customer", "booking_agent", "airline_staff"}:
-        flash("Invalid role.")
+        flash("Invalid role.", "danger")
         return redirect(url_for("auth.register_page"))
     if not username or not password or not name:
-        flash("Role, username, password and name are required.")
+        flash("Role, username, password and name are required.", "warning")
         return redirect(url_for("auth.register_page"))
 
     password_hash = generate_password_hash(password)
@@ -50,12 +50,15 @@ def register_page():
                 passport_country = request.form.get("passport_country", "").strip()
 
                 if not passport_number or not passport_expiration_date or not date_of_birth:
-                    flash("Customer requires passport number, passport expiration date and date of birth.")
+                    flash(
+                        "Customer requires passport number, passport expiration date and date of birth.",
+                        "warning",
+                    )
                     return redirect(url_for("auth.register_page"))
 
                 cur.execute("SELECT 1 FROM customer WHERE email = %s", (username,))
                 if cur.fetchone():
-                    flash("Customer email already exists.")
+                    flash("Customer email already exists.", "danger")
                     return redirect(url_for("auth.register_page"))
 
                 cur.execute(
@@ -84,7 +87,7 @@ def register_page():
             elif role == "booking_agent":
                 cur.execute("SELECT 1 FROM booking_agent WHERE email = %s", (username,))
                 if cur.fetchone():
-                    flash("Booking agent email already exists.")
+                    flash("Booking agent email already exists.", "danger")
                     return redirect(url_for("auth.register_page"))
 
                 cur.execute(
@@ -99,14 +102,14 @@ def register_page():
                 airline_name = request.form.get("airline_name", "").strip()
                 staff_dob = request.form.get("staff_dob", "").strip()
                 if not airline_name or not staff_dob:
-                    flash("Airline name and date of birth are required for staff.")
+                    flash("Airline name and date of birth are required for staff.", "warning")
                     return redirect(url_for("auth.register_page"))
 
                 first_name, last_name = split_name(name)
 
                 cur.execute("SELECT 1 FROM airline_staff WHERE username = %s", (username,))
                 if cur.fetchone():
-                    flash("Staff username already exists.")
+                    flash("Staff username already exists.", "danger")
                     return redirect(url_for("auth.register_page"))
 
                 cur.execute(
@@ -119,20 +122,20 @@ def register_page():
                 )
 
             conn.commit()
-            flash("Registration successful.")
+            flash("Registration successful.", "success")
             return redirect(url_for("auth.register_page"))
 
     except pymysql.MySQLError as e:
         if conn:
             conn.rollback()
         print(f"[register][db_error] {e}")
-        flash("Registration failed. Please try again.")
+        flash("Registration failed. Please try again.", "danger")
         return redirect(url_for("auth.register_page"))
     except Exception as e:
         if conn:
             conn.rollback()
         print(f"[register][unexpected_error] {e}")
-        flash("Registration failed. Please try again.")
+        flash("Registration failed. Please try again.", "danger")
         return redirect(url_for("auth.register_page"))
     finally:
         if conn:
@@ -151,10 +154,10 @@ def login_page():
     password = request.form.get("password", "")
 
     if role not in {"customer", "booking_agent", "airline_staff"}:
-        flash("Invalid role.")
+        flash("Invalid role.", "danger")
         return redirect(url_for("auth.login_page"))
     if not username or not password:
-        flash("Role, username and password are required.")
+        flash("Role, username and password are required.", "warning")
         return redirect(url_for("auth.login_page"))
 
     conn = None
@@ -193,23 +196,23 @@ def login_page():
                     display_name = " ".join(name_parts) or username
 
             if not user_row or not verify_password(user_row["password"], password):
-                flash("Invalid username or password.")
+                flash("Invalid username or password.", "danger")
                 return redirect(url_for("auth.login_page"))
 
             session["user_role"] = role
             session["user_id"] = username
             session["user_name"] = display_name
 
-            flash("Login successful.")
+            flash("Login successful.", "success")
             return redirect(url_for("dashboard.dashboard"))
 
     except pymysql.MySQLError as e:
         print(f"[login][db_error] {e}")
-        flash("Login failed. Please try again.")
+        flash("Login failed. Please try again.", "danger")
         return redirect(url_for("auth.login_page"))
     except Exception as e:
         print(f"[login][unexpected_error] {e}")
-        flash("Login failed. Please try again.")
+        flash("Login failed. Please try again.", "danger")
         return redirect(url_for("auth.login_page"))
     finally:
         if conn:
@@ -219,5 +222,5 @@ def login_page():
 @bp.route("/logout", methods=["POST"])
 def logout():
     session.clear()
-    flash("You have logged out.")
+    flash("You have logged out.", "info")
     return redirect(url_for("auth.login_page"))
