@@ -42,7 +42,7 @@ def test_customer_login_sets_session_and_redirects(monkeypatch, client):
             }
         ]
     )
-    monkeypatch.setattr("aires.routes.auth.get_conn", lambda: connection)
+    monkeypatch.setattr("aires.db.get_conn", lambda: connection)
 
     response = client.post(
         "/login",
@@ -72,7 +72,7 @@ def test_login_rejects_bad_password(monkeypatch, client):
             }
         ]
     )
-    monkeypatch.setattr("aires.routes.auth.get_conn", lambda: connection)
+    monkeypatch.setattr("aires.db.get_conn", lambda: connection)
 
     response = client.post(
         "/login",
@@ -90,7 +90,7 @@ def test_login_rejects_bad_password(monkeypatch, client):
 
 def test_customer_registration_inserts_and_commits(monkeypatch, client):
     connection = FakeConnection([None])
-    monkeypatch.setattr("aires.routes.auth.get_conn", lambda: connection)
+    monkeypatch.setattr("aires.db.get_conn", lambda: connection)
 
     response = client.post(
         "/register",

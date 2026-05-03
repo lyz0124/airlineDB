@@ -1,13 +1,13 @@
 from datetime import datetime
 
-from .common import add_location_filter
+from .common import add_location_filter, extract_location
 
 
 def validate_public_search(search_form):
     if not any(search_form.values()):
         return "Please provide at least one search condition."
-    departure_location = search_form.get("departure_location") or search_form.get("departure_airport") or search_form.get("departure_city")
-    arrival_location = search_form.get("arrival_location") or search_form.get("arrival_airport") or search_form.get("arrival_city")
+    departure_location = extract_location(search_form, "departure")
+    arrival_location = extract_location(search_form, "arrival")
     if not departure_location:
         return "Please provide either a departure airport code or departure city."
     if not arrival_location:
@@ -42,8 +42,8 @@ def search_public_flights(cur, search_form):
     """
     params = []
 
-    departure_location = search_form.get("departure_location") or search_form.get("departure_airport") or search_form.get("departure_city")
-    arrival_location = search_form.get("arrival_location") or search_form.get("arrival_airport") or search_form.get("arrival_city")
+    departure_location = extract_location(search_form, "departure")
+    arrival_location = extract_location(search_form, "arrival")
     sql = add_location_filter(cur, sql, params, "f.departure_airport", "dep.airport_city", departure_location)
     sql = add_location_filter(cur, sql, params, "f.arrival_airport", "arr.airport_city", arrival_location)
 

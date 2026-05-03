@@ -2,8 +2,8 @@ from flask import Blueprint, render_template, request
 
 import pymysql
 
-from ..db import get_conn
-from ..services.common import get_location_options
+from ..db import with_cursor, get_conn
+from ..services.common import extract_location, get_location_options
 from ..services.public_service import (
     get_public_flight_status,
     search_public_flights,
@@ -17,16 +17,11 @@ def render_public_page(**context):
     location_options = context.get("location_options")
     if location_options is None:
         location_options = {"airports": [], "cities": []}
-        conn = None
         try:
-            conn = get_conn()
-            with conn.cursor() as cur:
+            with with_cursor() as cur:
                 location_options = get_location_options(cur)
         except Exception as e:
             print(f"[render_public_page][location_options_error] {e}")
-        finally:
-            if conn:
-                conn.close()
 
     return render_template(
         "login.html",
@@ -46,15 +41,9 @@ def render_public_page(**context):
 
 @bp.route("/search-flights", methods=["POST"])
 def public_search_flights():
-    departure_location = request.form.get("departure_location", "").strip()
-    arrival_location = request.form.get("arrival_location", "").strip()
     search_form = {
-        "departure_location": departure_location
-        or request.form.get("departure_airport", "").strip()
-        or request.form.get("departure_city", "").strip(),
-        "arrival_location": arrival_location
-        or request.form.get("arrival_airport", "").strip()
-        or request.form.get("arrival_city", "").strip(),
+        "departure_location": extract_location(request.form, "departure"),
+        "arrival_location": extract_location(request.form, "arrival"),
         "departure_date": request.form.get("departure_date", "").strip(),
     }
 
@@ -67,26 +56,21 @@ def public_search_flights():
             search_message_type="warning",
         )
 
-    conn = None
     try:
-        conn = get_conn()
-        with conn.cursor() as cur:
+        with with_cursor() as cur:
             rows = search_public_flights(cur, search_form)
 
-        return render_public_page(
-            search_form=search_form,
-            search_results=rows,
-            search_submitted=True,
-            search_message=None if rows else "No upcoming flights match your conditions.",
-            search_message_type="info",
-        )
+            return render_public_page(
+                search_form=search_form,
+                search_results=rows,
+                search_submitted=True,
+                search_message=None if rows else "No upcoming flights match your conditions.",
+                search_message_type="info",
+            )
     except pymysql.MySQLError as e:
         print(f"[public_search_flights][db_error] {e}")
     except Exception as e:
         print(f"[public_search_flights][unexpected_error] {e}")
-    finally:
-        if conn:
-            conn.close()
 
     return render_public_page(
         search_form=search_form,
@@ -118,26 +102,21 @@ def public_flight_status():
             status_message_type="warning",
         )
 
-    conn = None
     try:
-        conn = get_conn()
-        with conn.cursor() as cur:
+        with with_cursor() as cur:
             row = get_public_flight_status(cur, status_form["airline_name"], int(status_form["flight_num"]))
 
-        return render_public_page(
-            status_form=status_form,
-            status_result=row,
-            status_submitted=True,
-            status_message=None if row else "No in-progress flight found for this airline and flight number.",
-            status_message_type="info",
-        )
+            return render_public_page(
+                status_form=status_form,
+                status_result=row,
+                status_submitted=True,
+                status_message=None if row else "No in-progress flight found for this airline and flight number.",
+                status_message_type="info",
+            )
     except pymysql.MySQLError as e:
         print(f"[public_flight_status][db_error] {e}")
     except Exception as e:
         print(f"[public_flight_status][unexpected_error] {e}")
-    finally:
-        if conn:
-            conn.close()
 
     return render_public_page(
         status_form=status_form,

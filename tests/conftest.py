@@ -21,10 +21,11 @@ def client(app):
 
 
 class FakeCursor:
-    def __init__(self, rows=None):
+    def __init__(self, rows=None, connection=None):
         self.rows = list(rows or [])
         self.executed = []
         self.rowcount = 1
+        self.connection = connection
 
     def __enter__(self):
         return self
@@ -48,7 +49,7 @@ class FakeCursor:
 
 class FakeConnection:
     def __init__(self, rows=None):
-        self.cursor_obj = FakeCursor(rows)
+        self.cursor_obj = FakeCursor(rows, connection=self)
         self.committed = False
         self.rolled_back = False
         self.closed = False

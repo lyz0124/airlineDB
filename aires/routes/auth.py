@@ -3,7 +3,7 @@ from werkzeug.security import generate_password_hash
 
 import pymysql
 
-from ..db import get_conn
+from ..db import with_cursor
 from ..utils import split_name, verify_password
 
 bp = Blueprint("auth", __name__)
@@ -34,10 +34,8 @@ def register_page():
         return redirect(url_for("auth.register_page"))
 
     password_hash = generate_password_hash(password)
-    conn = None
     try:
-        conn = get_conn()
-        with conn.cursor() as cur:
+        with with_cursor() as cur:
             if role == "customer":
                 passport_number = request.form.get("passport_number", "").strip()
                 passport_expiration_date = request.form.get("passport_expiration_date", "").strip()
@@ -121,25 +119,18 @@ def register_page():
                     (username, password_hash, first_name, last_name, staff_dob or None, airline_name),
                 )
 
-            conn.commit()
+            cur.connection.commit()
             flash("Registration successful.", "success")
             return redirect(url_for("auth.register_page"))
 
     except pymysql.MySQLError as e:
-        if conn:
-            conn.rollback()
         print(f"[register][db_error] {e}")
         flash("Registration failed. Please try again.", "danger")
         return redirect(url_for("auth.register_page"))
     except Exception as e:
-        if conn:
-            conn.rollback()
         print(f"[register][unexpected_error] {e}")
         flash("Registration failed. Please try again.", "danger")
         return redirect(url_for("auth.register_page"))
-    finally:
-        if conn:
-            conn.close()
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -160,10 +151,8 @@ def login_page():
         flash("Role, username and password are required.", "warning")
         return redirect(url_for("auth.login_page"))
 
-    conn = None
     try:
-        conn = get_conn()
-        with conn.cursor() as cur:
+        with with_cursor() as cur:
             user_row = None
             display_name = username
 
@@ -214,9 +203,6 @@ def login_page():
         print(f"[login][unexpected_error] {e}")
         flash("Login failed. Please try again.", "danger")
         return redirect(url_for("auth.login_page"))
-    finally:
-        if conn:
-            conn.close()
 
 
 @bp.route("/logout", methods=["POST"])

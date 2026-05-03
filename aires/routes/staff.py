@@ -1,15 +1,38 @@
 from datetime import datetime
 
-from flask import Blueprint, flash, redirect, request, session, url_for
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
 import pymysql
 
 from ..decorators import role_required
-from ..db import get_conn
+from ..db import with_cursor
 from ..services.common import get_staff_profile, resolve_airport_code, staff_has_permission
+from ..services.dashboard_service import load_staff_dashboard
 from ..services.staff_service import build_flight_update_payload
 
 bp = Blueprint("staff", __name__, url_prefix="/staff")
+
+
+@bp.route("/dashboard")
+@role_required("airline_staff")
+def staff_dashboard():
+    user_id = session["user_id"]
+    user_name = session["user_name"]
+    context = {
+        "role": "airline_staff",
+        "user_id": user_id,
+        "user_name": user_name,
+        "staff_data": None,
+    }
+
+    try:
+        with with_cursor() as cur:
+            context["staff_data"] = load_staff_dashboard(cur, user_id, request.args)
+    except Exception as e:
+        print(f"[staff_dashboard][error] {e}")
+        flash("Failed to load dashboard data.", "danger")
+
+    return render_template("staff_dashboard.html", **context)
 
 
 @bp.route("/add-airport", methods=["POST"])
@@ -20,16 +43,14 @@ def staff_add_airport():
     airport_city = request.form.get("airport_city", "").strip()
     if not airport_name or not airport_city:
         flash("Airport name and city are required.")
-        return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+        return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
-    conn = None
     try:
-        conn = get_conn()
-        with conn.cursor() as cur:
+        with with_cursor() as cur:
             profile = get_staff_profile(cur, staff_user)
             if not profile or not staff_has_permission(profile.get("role"), "admin"):
                 flash("Admin permission required.")
-                return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
             cur.execute("INSERT IGNORE INTO city (city_name) VALUES (%s)", (airport_city,))
             cur.execute(
                 """
@@ -38,17 +59,12 @@ def staff_add_airport():
                 """,
                 (airport_name, airport_city),
             )
-            conn.commit()
+            cur.connection.commit()
             flash("Airport added successfully.")
     except Exception as e:
-        if conn:
-            conn.rollback()
         print(f"[staff_add_airport][error] {e}")
         flash("Failed to add airport.")
-    finally:
-        if conn:
-            conn.close()
-    return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+    return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
 
 @bp.route("/add-airplane", methods=["POST"])
@@ -59,16 +75,14 @@ def staff_add_airplane():
     seat_capacity_text = request.form.get("seat_capacity", "").strip()
     if not airplane_id_text.isdigit() or not seat_capacity_text.isdigit():
         flash("Airplane ID and seat capacity must be integers.")
-        return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+        return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
-    conn = None
     try:
-        conn = get_conn()
-        with conn.cursor() as cur:
+        with with_cursor() as cur:
             profile = get_staff_profile(cur, staff_user)
             if not profile or not staff_has_permission(profile.get("role"), "admin"):
                 flash("Admin permission required.")
-                return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
             cur.execute(
                 """
@@ -77,22 +91,15 @@ def staff_add_airplane():
                 """,
                 (profile["airline_name"], int(airplane_id_text), int(seat_capacity_text)),
             )
-            conn.commit()
+            cur.connection.commit()
             flash("Airplane added successfully.")
     except pymysql.IntegrityError as e:
-        if conn:
-            conn.rollback()
         print(f"[staff_add_airplane][integrity_error] {e}")
         flash("Failed to add airplane: duplicate airplane ID for this airline.")
     except Exception as e:
-        if conn:
-            conn.rollback()
         print(f"[staff_add_airplane][error] {e}")
         flash("Failed to add airplane.")
-    finally:
-        if conn:
-            conn.close()
-    return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+    return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
 
 @bp.route("/create-flight", methods=["POST"])
@@ -110,36 +117,34 @@ def staff_create_flight():
 
     if not flight_num_text.isdigit() or not airplane_id_text.isdigit():
         flash("Flight number is required and airplane ID must be an integer.")
-        return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+        return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
     try:
         dep_dt = datetime.strptime(departure_time, "%Y-%m-%dT%H:%M")
         arr_dt = datetime.strptime(arrival_time, "%Y-%m-%dT%H:%M")
         if arr_dt <= dep_dt:
             flash("Arrival time must be later than departure time.")
-            return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+            return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
         price_value = float(price_text)
         if price_value <= 0:
             flash("Price must be positive.")
-            return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+            return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
     except ValueError:
         flash("Invalid datetime or price format.")
-        return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+        return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
-    conn = None
     try:
-        conn = get_conn()
-        with conn.cursor() as cur:
+        with with_cursor() as cur:
             profile = get_staff_profile(cur, staff_user)
             if not profile or not staff_has_permission(profile.get("role"), "admin"):
                 flash("Admin permission required.")
-                return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
             departure_airport_code = resolve_airport_code(cur, departure_airport)
             arrival_airport_code = resolve_airport_code(cur, arrival_airport)
             if not departure_airport_code or not arrival_airport_code:
                 flash("Departure and arrival airports must be existing airport codes.")
-                return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
             cur.execute(
                 """
@@ -160,22 +165,15 @@ def staff_create_flight():
                     int(airplane_id_text),
                 ),
             )
-            conn.commit()
+            cur.connection.commit()
             flash("Flight created successfully.")
     except pymysql.IntegrityError as e:
-        if conn:
-            conn.rollback()
         print(f"[staff_create_flight][integrity_error] {e}")
         flash("Failed to create flight: check duplicate flight number, airplane ID, and airport codes.")
     except Exception as e:
-        if conn:
-            conn.rollback()
         print(f"[staff_create_flight][error] {e}")
         flash("Failed to create flight.")
-    finally:
-        if conn:
-            conn.close()
-    return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+    return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
 
 @bp.route("/edit-flight", methods=["POST"])
@@ -197,22 +195,20 @@ def staff_edit_flight():
 
     if not airline_name or not flight_num:
         flash("Airline and current flight number are required.")
-        return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+        return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
     if not flight_num.isdigit():
         flash("Current flight number must be an integer.")
-        return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+        return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
-    conn = None
     try:
-        conn = get_conn()
-        with conn.cursor() as cur:
+        with with_cursor() as cur:
             profile = get_staff_profile(cur, staff_user)
             if not profile or not staff_has_permission(profile.get("role"), "admin"):
                 flash("Admin permission required.")
-                return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
             if airline_name != profile["airline_name"]:
                 flash("You can only edit flights for your airline.")
-                return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
             cur.execute(
                 """
@@ -226,18 +222,18 @@ def staff_edit_flight():
             existing = cur.fetchone()
             if not existing:
                 flash("Flight not found.")
-                return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
             update_payload, error_message = build_flight_update_payload(existing, form_data)
             if error_message:
                 flash(error_message)
-                return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
             departure_airport_code = resolve_airport_code(cur, update_payload["departure_airport"])
             arrival_airport_code = resolve_airport_code(cur, update_payload["arrival_airport"])
             if not departure_airport_code or not arrival_airport_code:
                 flash("Departure and arrival airports must be existing airport codes.")
-                return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
             update_payload["departure_airport"] = departure_airport_code
             update_payload["arrival_airport"] = arrival_airport_code
 
@@ -267,26 +263,17 @@ def staff_edit_flight():
                     int(flight_num),
                 ),
             )
-            conn.commit()
+            cur.connection.commit()
             flash("Flight updated successfully.")
     except ValueError:
-        if conn:
-            conn.rollback()
         flash("Invalid format for datetime, price, or airplane ID.")
     except pymysql.IntegrityError as e:
-        if conn:
-            conn.rollback()
         print(f"[staff_edit_flight][integrity_error] {e}")
         flash("Failed to edit flight: check flight number uniqueness, airport code, and airplane ID.")
     except Exception as e:
-        if conn:
-            conn.rollback()
         print(f"[staff_edit_flight][error] {e}")
         flash("Failed to edit flight.")
-    finally:
-        if conn:
-            conn.close()
-    return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+    return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
 
 @bp.route("/authorize-agent", methods=["POST"])
@@ -296,21 +283,19 @@ def staff_authorize_agent():
     agent_email = request.form.get("agent_email", "").strip()
     if not agent_email:
         flash("Agent email is required.")
-        return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+        return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
-    conn = None
     try:
-        conn = get_conn()
-        with conn.cursor() as cur:
+        with with_cursor() as cur:
             profile = get_staff_profile(cur, staff_user)
             if not profile or not staff_has_permission(profile.get("role"), "admin"):
                 flash("Admin permission required.")
-                return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
             cur.execute("SELECT 1 FROM booking_agent WHERE email = %s", (agent_email,))
             if not cur.fetchone():
                 flash("Booking agent does not exist.")
-                return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
             cur.execute(
                 """
@@ -319,17 +304,12 @@ def staff_authorize_agent():
                 """,
                 (agent_email, profile["airline_name"]),
             )
-            conn.commit()
+            cur.connection.commit()
             flash("Agent authorized for this airline.")
     except Exception as e:
-        if conn:
-            conn.rollback()
         print(f"[staff_authorize_agent][error] {e}")
         flash("Failed to authorize agent.")
-    finally:
-        if conn:
-            conn.close()
-    return redirect(url_for("dashboard.dashboard", tab="staff-admin"))
+    return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
 
 @bp.route("/update-flight-status", methods=["POST"])
@@ -341,20 +321,18 @@ def staff_update_flight_status():
     status = request.form.get("status", "").strip()
     if not flight_num_text.isdigit() or status not in {"upcoming", "in-progress", "delayed"}:
         flash("Invalid input for status update.")
-        return redirect(url_for("dashboard.dashboard", tab="staff-operator"))
+        return redirect(url_for("staff.staff_dashboard", tab="staff-operator"))
 
-    conn = None
     try:
-        conn = get_conn()
-        with conn.cursor() as cur:
+        with with_cursor() as cur:
             profile = get_staff_profile(cur, staff_user)
             if not profile or not staff_has_permission(profile.get("role"), "operator"):
                 flash("Operator permission required.")
-                return redirect(url_for("dashboard.dashboard", tab="staff-operator"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-operator"))
 
             if airline_name != profile["airline_name"]:
                 flash("You can only update flights for your airline.")
-                return redirect(url_for("dashboard.dashboard", tab="staff-operator"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-operator"))
 
             cur.execute(
                 """
@@ -366,16 +344,11 @@ def staff_update_flight_status():
             )
             if cur.rowcount == 0:
                 flash("Flight not found.")
-                return redirect(url_for("dashboard.dashboard", tab="staff-operator"))
+                return redirect(url_for("staff.staff_dashboard", tab="staff-operator"))
 
-            conn.commit()
+            cur.connection.commit()
             flash("Flight status updated.")
     except Exception as e:
-        if conn:
-            conn.rollback()
         print(f"[staff_update_flight_status][error] {e}")
         flash("Failed to update status.")
-    finally:
-        if conn:
-            conn.close()
-    return redirect(url_for("dashboard.dashboard", tab="staff-operator"))
+    return redirect(url_for("staff.staff_dashboard", tab="staff-operator"))
