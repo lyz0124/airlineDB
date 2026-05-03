@@ -1,42 +1,56 @@
+---
+header-includes:
+  - \usepackage[left=2cm,top=1cm,right=2cm,bottom=2cm]{geometry}
+---
 # Airline DB
 
 This is a course project for CSCI-SHU 213 Databases.
 
-## Bonus functionalities
+## TODO list
 
-### Search enhancements
+### Phase 1 
 
 - [x] Airport and city in one single search box (Search airport code first, and fallback to city if not matched)
   - [x] Only allow free input of airports and cities for airline staff with admin permission when solely creating airports and cities
   - [x] For other cases, provide a **searchable** drop-down menu
 - [x] Blur search on cities: case-insensitive, match by containing instead of equal
 
-## TODO I
+### Phase 2
 
-Customer dashboard:
+Customer dashboard:  
+
 - [x] In purchased flights panel, also enable blur search city search in `origin airport` field and `destination airport` field.
 - [x] Add labels to the date range input boxes to indicate start date and end date
 - [x] For the review spending, set the default view as a custom view with default arguments. i.e., merge the two views.
 
-Booking Agents:
+Booking Agents:  
+
 - [x] For comission and number of sold tickets, display both in past 30 days and over all of the time
 
-Airline Staff:
+Airline Staff:  
+
 - [x] Display analytics: tickets sold per month by year, and set the default year to display as the current year.
 - [x] Display delay vs on-time statistics grouping by year instead of displaying last year's
 - [x] Rank top destinations on number of tickets sold to that destination, isntead of flights to that destination
 - [x] For all form fields where flight numbers are inputted, make the former airline field not editable, since the airline staff can only edit flights in their own airline. (The sql statement was correct, but the displayed form entry was editable)
 
-## TODO II
+### Phase 3
 
-Airline Staff dashboard:
+Airline Staff dashboard:  
+
 - [x] Replace the add airplane and add airport box with a searchable list. When the search term is not matched, give the option to add an airplane or airport. List ten for each by default.
   - [x] If fail to add an airport or airplane, instead of only reporting error "fail to add”, report if it is because the entry already exists.
 - [x] Arrange the airline staff analytics panel more clearly. Make it more readable. Indicate which components are only affected by the year filter, which are affected by both year and month filter, and which are not affected by any filter.
 
-Register:
+Register:  
+
 - [x] Change the airline field of the register form of airline staff to be a searchable dropdown menu.
 - [x] If the booking agent ID is actually useless, remove that field.
+
+### Phase 4
+
+- [x] Customers can cancel tickets before 24 hours of departure
+- [x] Admin role staff can manage staff roles and permissions
 
 ## Repository Manifest
 
@@ -84,42 +98,110 @@ Register:
 - **Public: Search upcoming flights**
   - Handler: [aires/routes/public.py](aires/routes/public.py)::`public_search_flights`
   - Service: [aires/services/public_service.py](aires/services/public_service.py)::`search_public_flights`
-  - Key SQL: SELECT from `flight` JOIN `airport` (dep/arr) WHERE `f.departure_time >= NOW()` plus location filters added by `add_location_filter` (which resolves airport code or uses `LOWER(city) LIKE %s`).
+  - Key SQL:
+    ```sql
+    SELECT from `flight` JOIN `airport` (dep/arr) 
+    WHERE `f.departure_time >= NOW()` 
+    ```
+    plus location filters added by `add_location_filter`   
+    (which resolves airport code or uses `LOWER(city) LIKE %s`)
 
 - **Public: In-progress flight status lookup**
   - Handler: [aires/routes/public.py](aires/routes/public.py)::`public_flight_status`
   - Service: [aires/services/public_service.py](aires/services/public_service.py)::`get_public_flight_status`
-  - Key SQL: SELECT ... FROM `flight` WHERE `airline_name = %s AND flight_num = %s AND status = 'in-progress'`.
+  - Key SQL:
+    ```sql
+    SELECT ... FROM `flight` 
+    WHERE `airline_name = %s AND flight_num = %s AND status = 'in-progress'`
+    ```
 
 - **Register (customer / booking agent / airline staff)**
   - Handler: [aires/routes/auth.py](aires/routes/auth.py)::`register_page` (POST)
-  - Key SQL: INSERT into `customer` or `booking_agent` or `airline_staff` (see route); pre-checks use SELECT 1 FROM corresponding table to detect duplicates.
+  - Key SQL:
+    ```sql
+    INSERT into `customer` or `booking_agent` or `airline_staff` (see route); 
+    ```
+    pre-checks use `SELECT 1 FROM corresponding table` to detect duplicates
 
 - **Login**
   - Handler: [aires/routes/auth.py](aires/routes/auth.py)::`login_page`
-  - Key SQL: SELECT email/password FROM `customer` OR `booking_agent` OR SELECT username/password FROM `airline_staff` to validate credentials.
+  - Key SQL:
+    ```sql
+    SELECT email/password FROM `customer` OR `booking_agent` 
+    ```
+    or
+    ```sql
+    SELECT username/password FROM `airline_staff` 
+    ```
+    to validate credentials
 
 - **Customer: Dashboard — search & purchased flights**
   - Handler: [aires/routes/customer.py](aires/routes/customer.py)::`customer_dashboard` calls `load_customer_dashboard` in [aires/services/dashboard_service.py](aires/services/dashboard_service.py).
-  - Services used include `get_customer_search_results` (SELECT from `flight` JOIN `airport` JOIN `airplane` LEFT JOIN `ticket`) and `get_customer_purchased_flights` (SELECT from `purchases` JOIN `ticket` JOIN `flight`).
+  - Services used include:
+    - `get_customer_search_results`:
+      ```sql
+      SELECT from `flight` JOIN `airport` JOIN `airplane` LEFT JOIN `ticket`
+      ```
+    - `get_customer_purchased_flights`:
+      ```sql
+      SELECT from `purchases` JOIN `ticket` JOIN `flight`
+      ```
 
 - **Customer: Purchase ticket**
   - Handler: [aires/routes/customer.py](aires/routes/customer.py)::`customer_purchase`
   - Service: [aires/services/purchase_service.py](aires/services/purchase_service.py)::`create_purchase`
-  - Key SQL: SELECT flight capacity/price (JOIN `flight`, `airplane`, LEFT JOIN `ticket` to count sold tickets), SELECT customer existence FROM `customer`, INSERT into `ticket`, INSERT into `purchases`.
+  - Key SQL:
+    ```sql
+    SELECT flight capacity/price (JOIN `flight`, `airplane`, LEFT JOIN `ticket` to count sold tickets), 
+    SELECT customer existence FROM `customer`, 
+    INSERT into `ticket`, 
+    INSERT into `purchases`
+    ```
 
 - **Customer: Cancel purchase**
   - Handler: [aires/routes/customer.py](aires/routes/customer.py)::`customer_cancel`
   - Service: [aires/services/purchase_service.py](aires/services/purchase_service.py)::`cancel_purchase`
-  - Key SQL: SELECT purchase + flight info JOINing `purchases`, `ticket`, `flight` to check timing; DELETE FROM `purchases` and DELETE FROM `ticket` when allowed.
+  - Key SQL:
+    ```sql
+    SELECT purchase + flight info JOINing `purchases`, `ticket`, `flight` --to check timing; 
+    DELETE FROM `purchases` and DELETE FROM `ticket` --when allowed
+    ```
 
 - **Airline Staff: Dashboard (flights list, passengers, customer trips, analytics)**
   - Handler: [aires/routes/staff.py](aires/routes/staff.py)::`staff_dashboard` calls `load_staff_dashboard` in [aires/services/dashboard_service.py](aires/services/dashboard_service.py).
-  - Queries: staff dashboards aggregate flights and purchases (SELECTs on `flight`, JOIN `airport`, LEFT JOIN `ticket`, JOIN `airplane`), top destinations (`COUNT(DISTINCT t.ticket_id)` grouped by arrival airport), and other analytics (monthly sums using `purchases` JOIN `ticket` JOIN `flight`).
+  - Queries:
+    - Staff dashboards aggregate flights and purchases:
+      ```sql
+      SELECTs on `flight`, JOIN `airport`, LEFT JOIN `ticket`, JOIN `airplane`
+      ```
+    - Top destinations:
+      ```sql
+      COUNT(DISTINCT t.ticket_id) --grouped by arrival airport
+      ```
+    - Other analytics:
+      ```sql
+      `purchases` JOIN `ticket` JOIN `flight` --monthly sums 
+      ```
 
 - **Airline Staff: Add airport / add airplane / create & edit flight**
   - Handler: [aires/routes/staff.py](aires/routes/staff.py)::`staff_add_airport`, `staff_add_airplane`, `staff_create_flight`, `staff_edit_flight`.
-  - Key SQL examples: INSERT INTO `city` / INSERT INTO `airport`; INSERT INTO `airplane`; INSERT INTO `flight`; UPDATE `flight` (edit flow uses payload prepared by staff service).
+  - Key SQL examples:
+    ```sql
+    INSERT INTO `city` / INSERT INTO `airport`; 
+    INSERT INTO `airplane`; 
+    INSERT INTO `flight`; 
+    UPDATE `flight` --(edit flow uses payload prepared by staff service)
+    ```
 
 - **Shared helpers**
-  - [aires/services/common.py](aires/services/common.py) provides `resolve_airport_code` (SELECT airport_name FROM `airport` WHERE LOWER(airport_name) = LOWER(%s)), `get_airport_list`, `get_airline_list`, and `get_staff_profile` (SELECT from `airline_staff`). These are used across routes for validation and dropdowns.
+  - [aires/services/common.py](aires/services/common.py) provides:
+    - `resolve_airport_code`:
+      ```sql
+      SELECT airport_name FROM `airport` WHERE LOWER(airport_name) = LOWER(%s)
+      ```
+    - `get_airport_list`, `get_airline_list`
+    - `get_staff_profile`:
+      ```sql
+      SELECT from `airline_staff`
+      ```
+    These are used across routes for validation and dropdowns.
