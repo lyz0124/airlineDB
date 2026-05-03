@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def get_next_ticket_id(cur):
@@ -87,3 +87,42 @@ def create_purchase(cur, customer_email, airline_name, flight_num, booking_agent
         (ticket_id, customer_email, booking_agent_email),
     )
     return True, f"Ticket purchased successfully. Ticket ID: {ticket_id}"
+
+
+def cancel_purchase(cur, ticket_id, customer_email, agent_email=None):
+    """Cancel a purchase if it's at least 24 hours before departure. Deletes ticket and purchase records."""
+    # Look up the purchase and associated flight
+    if agent_email:
+        cur.execute(
+            """
+            SELECT p.ticket_id, p.customer_email, f.departure_time, f.airline_name, f.flight_num
+            FROM purchases p
+            JOIN ticket t ON t.ticket_id = p.ticket_id
+            JOIN flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
+            WHERE p.ticket_id = %s AND p.booking_agent_email = %s
+            """,
+            (ticket_id, agent_email),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT p.ticket_id, p.customer_email, f.departure_time, f.airline_name, f.flight_num
+            FROM purchases p
+            JOIN ticket t ON t.ticket_id = p.ticket_id
+            JOIN flight f ON f.airline_name = t.airline_name AND f.flight_num = t.flight_num
+            WHERE p.ticket_id = %s AND p.customer_email = %s
+            """,
+            (ticket_id, customer_email),
+        )
+
+    row = cur.fetchone()
+    if not row:
+        return False, "Purchase record not found."
+
+    if row["departure_time"] <= datetime.now() + timedelta(hours=24):
+        return False, "Cancellations are only allowed at least 24 hours before departure."
+
+    # Delete purchase record first, then ticket record
+    cur.execute("DELETE FROM purchases WHERE ticket_id = %s", (ticket_id,))
+    cur.execute("DELETE FROM ticket WHERE ticket_id = %s", (ticket_id,))
+    return True, f"Ticket {ticket_id} cancelled successfully."

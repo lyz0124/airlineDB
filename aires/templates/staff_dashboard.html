@@ -167,30 +167,67 @@
       <div class="card shadow-sm border-0 mb-4">
         <div class="card-body p-4">
           <h4 class="mb-3">Admin Actions</h4>
+
+          <!-- Airport & Airplane Lists -->
+          <div class="row g-4 mb-4">
+            <div class="col-md-6">
+              <h6>Existing Airports <small class="text-muted">(first {{ staff_data.airport_list|length }})</small></h6>
+              <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                <table class="table table-sm table-striped mb-0">
+                  <thead><tr><th>Code</th><th>City</th></tr></thead>
+                  <tbody>
+                    {% for ap in staff_data.airport_list %}
+                    <tr><td>{{ ap.airport_name }}</td><td>{{ ap.airport_city }}</td></tr>
+                    {% else %}
+                    <tr><td colspan="2" class="text-muted">No airports found.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <h6>Existing Airplanes <small class="text-muted">(first {{ staff_data.airplane_list|length }})</small></h6>
+              <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                <table class="table table-sm table-striped mb-0">
+                  <thead><tr><th>ID</th><th>Seats</th></tr></thead>
+                  <tbody>
+                    {% for ap in staff_data.airplane_list %}
+                    <tr><td>{{ ap.airplane_id }}</td><td>{{ ap.seat_capacity }}</td></tr>
+                    {% else %}
+                    <tr><td colspan="2" class="text-muted">No airplanes found.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add Forms -->
           <div class="row g-4">
             <div class="col-md-6">
               <h6>Add Airport</h6>
-              <form method="post" action="{{ url_for('staff.staff_add_airport') }}" class="row g-2 mb-3">
-                <div class="col-6"><input class="form-control" name="airport_name" placeholder="Airport code/name" required></div>
+              <form method="post" action="{{ url_for('staff.staff_add_airport') }}" class="row g-2">
+                <div class="col-6"><input class="form-control" name="airport_name" list="staff-airport-list" placeholder="Airport code/name" required></div>
                 <div class="col-6"><input class="form-control" name="airport_city" placeholder="City" required></div>
                 <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">Add Airport</button></div>
               </form>
 
-              <h6>Add Airplane</h6>
+              <h6 class="mt-3">Add Airplane</h6>
               <form method="post" action="{{ url_for('staff.staff_add_airplane') }}" class="row g-2">
-                <div class="col-6"><input class="form-control" name="airline_name" value="{{ staff_data.airline_name }}" placeholder="Airline Code/Name (e.g. MU)" required></div>
-                <div class="col-6"><input class="form-control" name="airplane_id" placeholder="Airplane ID (integer)" required></div>
+                <div class="col-6"><input class="form-control" name="airline_name" value="{{ staff_data.airline_name }}" readonly></div>
+                <div class="col-6"><input class="form-control" name="airplane_id" list="staff-airplane-list" placeholder="Airplane ID (integer)" required></div>
                 <div class="col-12"><input class="form-control" name="seat_capacity" placeholder="Seat Capacity (integer)" required></div>
                 <div class="col-12"><button class="btn btn-sm btn-primary" type="submit">Add Airplane</button></div>
               </form>
             </div>
+
             <div class="col-md-6">
               <h6>Create Flight</h6>
               <form method="post" action="{{ url_for('staff.staff_create_flight') }}" class="row g-2 mb-3">
                 <div class="col-6"><input class="form-control" name="flight_num" placeholder="Flight Number" required></div>
-                <div class="col-6"><input class="form-control" name="airplane_id" placeholder="Airplane ID" required></div>
-                <div class="col-6"><input class="form-control" type="search" name="departure_airport" list="staff-airport-options" placeholder="Departure Airport" required></div>
-                <div class="col-6"><input class="form-control" type="search" name="arrival_airport" list="staff-airport-options" placeholder="Arrival Airport" required></div>
+                <div class="col-6"><input class="form-control" name="airplane_id" list="staff-airplane-list" placeholder="Airplane ID" required></div>
+                <div class="col-6"><input class="form-control" type="search" name="departure_airport" list="staff-airport-list" placeholder="Departure Airport" required></div>
+                <div class="col-6"><input class="form-control" type="search" name="arrival_airport" list="staff-airport-list" placeholder="Arrival Airport" required></div>
                 <div class="col-6"><input class="form-control" type="datetime-local" name="departure_time" required></div>
                 <div class="col-6"><input class="form-control" type="datetime-local" name="arrival_time" required></div>
                 <div class="col-6"><input class="form-control" name="price" placeholder="Price" required></div>
@@ -206,12 +243,12 @@
 
               <h6>Edit Existing Flight</h6>
               <form method="post" action="{{ url_for('staff.staff_edit_flight') }}" class="row g-2 mb-3">
-                <div class="col-6"><input class="form-control" name="airline_name" value="{{ staff_data.airline_name }}" placeholder="Airline Code/Name" readonly></div>
-                <div class="col-6"><input class="form-control" name="flight_num" placeholder="Current Flight Number (required)" required></div>
+                <div class="col-6"><input class="form-control" name="airline_name" value="{{ staff_data.airline_name }}" readonly></div>
+                <div class="col-6"><input class="form-control" name="flight_num" placeholder="Current Flight Number" required></div>
                 <div class="col-6"><input class="form-control" name="new_flight_num" placeholder="New Flight Number (optional)"></div>
-                <div class="col-6"><input class="form-control" name="airplane_id" placeholder="New Airplane ID (optional integer)"></div>
-                <div class="col-6"><input class="form-control" type="search" name="departure_airport" list="staff-airport-options" placeholder="New Departure Airport (optional)"></div>
-                <div class="col-6"><input class="form-control" type="search" name="arrival_airport" list="staff-airport-options" placeholder="New Arrival Airport (optional)"></div>
+                <div class="col-6"><input class="form-control" name="airplane_id" list="staff-airplane-list" placeholder="New Airplane ID (optional)"></div>
+                <div class="col-6"><input class="form-control" type="search" name="departure_airport" list="staff-airport-list" placeholder="New Departure Airport (optional)"></div>
+                <div class="col-6"><input class="form-control" type="search" name="arrival_airport" list="staff-airport-list" placeholder="New Arrival Airport (optional)"></div>
                 <div class="col-6"><input class="form-control" type="datetime-local" name="departure_time" placeholder="New Departure Time (optional)"></div>
                 <div class="col-6"><input class="form-control" type="datetime-local" name="arrival_time" placeholder="New Arrival Time (optional)"></div>
                 <div class="col-6"><input class="form-control" name="price" placeholder="New Price (optional)"></div>
@@ -233,12 +270,86 @@
                 <div class="col-8"><input class="form-control" name="agent_email" type="email" placeholder="agent@email.com" required></div>
                 <div class="col-4"><button class="btn btn-sm btn-primary w-100" type="submit">Authorize</button></div>
               </form>
-              <datalist id="staff-airport-options">
-                {% for airport in staff_data.location_options.airports %}
-                  <option value="{{ airport.airport_name }}">{{ airport.airport_name }} - {{ airport.airport_city }}</option>
+
+              <datalist id="staff-airport-list">
+                {% for ap in staff_data.airport_list %}
+                  <option value="{{ ap.airport_name }}">{{ ap.airport_name }} - {{ ap.airport_city }}</option>
+                {% endfor %}
+              </datalist>
+              <datalist id="staff-airplane-list">
+                {% for ap in staff_data.airplane_list %}
+                  <option value="{{ ap.airplane_id }}">ID {{ ap.airplane_id }} ({{ ap.seat_capacity }} seats)</option>
                 {% endfor %}
               </datalist>
             </div>
+          </div>
+
+          <!-- Staff Management -->
+          <hr class="my-4">
+          <h5 class="mb-3">Staff Management &mdash; {{ staff_data.airline_name }}</h5>
+          <p class="text-muted small mb-3">Search, view, and update roles for staff members in your airline.</p>
+
+          <form method="get" action="{{ url_for('staff.staff_dashboard') }}" class="row g-2 mb-3">
+            <input type="hidden" name="staff_start_date" value="{{ staff_data.flight_filters.start_date }}">
+            <input type="hidden" name="staff_end_date" value="{{ staff_data.flight_filters.end_date }}">
+            <input type="hidden" name="staff_origin" value="{{ staff_data.flight_filters.origin }}">
+            <input type="hidden" name="staff_destination" value="{{ staff_data.flight_filters.destination }}">
+            <input type="hidden" name="staff_agent_rank_by" value="{{ staff_data.staff_agent_rank_by }}">
+            <input type="hidden" name="passenger_flight_num" value="{{ staff_data.passenger_query_flight }}">
+            <input type="hidden" name="staff_customer_email" value="{{ staff_data.staff_customer_email }}">
+            <input type="hidden" name="staff_year" value="{{ staff_data.selected_year }}">
+            <input type="hidden" name="staff_month" value="{{ staff_data.selected_month }}">
+            <div class="col-md-6">
+              <input class="form-control" type="search" name="staff_search" placeholder="Search by username or name..." value="{{ request.args.get('staff_search', '') }}">
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-outline-primary w-100" type="submit">Search</button>
+            </div>
+            <div class="col-md-2">
+              <a href="{{ url_for('staff.staff_dashboard') }}" class="btn btn-outline-secondary w-100">Clear</a>
+            </div>
+          </form>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr><th>Username</th><th>Name</th><th>Current Role</th><th>Change Role</th></tr>
+              </thead>
+              <tbody>
+                {% for member in staff_data.staff_members %}
+                <tr>
+                  <td>{{ member.username }}</td>
+                  <td>{{ member.first_name }} {{ member.last_name }}</td>
+                  <td>
+                    <span class="badge {% if member.role == 'admin' %}bg-danger{% elif member.role == 'operator' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">
+                      {{ member.role }}
+                    </span>
+                  </td>
+                  <td>
+                    {% if member.username != session.user_id %}
+                    <form method="post" action="{{ url_for('staff.staff_update_role') }}" class="row g-1">
+                      <input type="hidden" name="target_username" value="{{ member.username }}">
+                      <div class="col-6">
+                        <select class="form-select form-select-sm" name="new_role">
+                          <option value="admin" {% if member.role == 'admin' %}selected{% endif %}>admin</option>
+                          <option value="operator" {% if member.role == 'operator' %}selected{% endif %}>operator</option>
+                          <option value="both" {% if member.role == 'both' %}selected{% endif %}>both</option>
+                        </select>
+                      </div>
+                      <div class="col-4">
+                        <button class="btn btn-sm btn-outline-primary" type="submit">Update</button>
+                      </div>
+                    </form>
+                    {% else %}
+                    <span class="text-muted small">(you)</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-muted">No staff members found.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -266,11 +377,15 @@
 
       <div class="card shadow-sm border-0 mb-4">
         <div class="card-body p-4">
-          <h4 class="mb-3">Airline Staff - Analytics</h4>
+          <h4 class="mb-3">
+            Airline Staff &mdash; Analytics
+            <span class="badge bg-secondary ms-2" style="font-weight:normal;font-size:0.6rem;">Y=by Year | YM=by Year+Month | &mdash;=no filter</span>
+          </h4>
 
-          <form method="get" action="{{ url_for('staff.staff_dashboard') }}" class="row g-3 mb-4">
+          <form method="get" action="{{ url_for('staff.staff_dashboard') }}" class="row g-3 mb-4 p-3 bg-light rounded border">
+            <div class="col-12"><h6 class="text-muted mb-2">Filter Controls</h6></div>
             <div class="col-md-2">
-              <label class="form-label small">Year</label>
+              <label class="form-label small">Year <span class="text-muted">(Y, YM)</span></label>
               <select class="form-select" name="staff_year">
                 {% for y in [2023, 2024, 2025, 2026] %}
                   <option value="{{ y }}" {% if staff_data.selected_year|int == y %}selected{% endif %}>{{ y }}</option>
@@ -278,8 +393,9 @@
               </select>
             </div>
             <div class="col-md-2">
-              <label class="form-label small">Month</label>
+              <label class="form-label small">Month <span class="text-muted">(YM)</span></label>
               <select class="form-select" name="staff_month">
+                <option value="">-- All Year --</option>
                 {% for m in range(1, 13) %}
                   <option value="{{ m }}" {% if staff_data.selected_month|int == m %}selected{% endif %}>{{ m }}</option>
                 {% endfor %}
@@ -300,73 +416,108 @@
             </div>
           </form>
 
-          <h5 class="mb-3">Top 5 Booking Agents ({{ staff_data.selected_year }}-{{ staff_data.selected_month }}, ranked by {{ 'commission' if staff_data.staff_agent_rank_by == 'commission' else 'tickets' }})</h5>
-          <div class="table-responsive mb-4">
-            <table class="table table-sm">
-              <thead>
-                <tr><th>Agent Email</th><th>Tickets Sold</th><th>Total Commission</th></tr>
-              </thead>
-              <tbody>
-                {% for agent in staff_data.top_agents %}
-                <tr><td>{{ agent.agent_email }}</td><td>{{ agent.ticket_count }}</td><td>${{ "%.2f"|format(agent.commission_total) }}</td></tr>
-                {% else %}
-                <tr><td colspan="3" class="text-muted">No data available for this period.</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
+          <!-- Section 1: Affected by both Year & Month -->
+          <div class="border-start border-3 border-primary ps-3 mb-4">
+            <h5 class="mb-1">
+              Top 5 Booking Agents
+              <span class="badge bg-primary" style="font-size:0.6rem;">YM</span>
+              <small class="text-muted">({{ staff_data.selected_year }}-{% if staff_data.selected_month %}{{ staff_data.selected_month }}{% else %}all{% endif %})</small>
+            </h5>
+            <p class="text-muted small mb-2">Affected by: Year &amp; Month filters, ranking metric.</p>
+            <div class="table-responsive">
+              <table class="table table-sm">
+                <thead>
+                  <tr><th>Agent Email</th><th>Tickets Sold</th><th>Total Commission</th></tr>
+                </thead>
+                <tbody>
+                  {% for agent in staff_data.top_agents %}
+                  <tr><td>{{ agent.agent_email }}</td><td>{{ agent.ticket_count }}</td><td>${{ "%.2f"|format(agent.commission_total) }}</td></tr>
+                  {% else %}
+                  <tr><td colspan="3" class="text-muted">No data available for this period.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div class="row mb-4">
-            <div class="col-md-4">
-              <div class="border rounded p-3 text-center">
-                <div class="text-muted small">Most Frequent Customer (Last Year)</div>
-                {% if staff_data.most_frequent_customer %}
-                  <div class="h6 mb-0">{{ staff_data.most_frequent_customer.customer_email }}</div>
-                  <div class="small">Tickets: {{ staff_data.most_frequent_customer.ticket_count }}</div>
-                {% else %}
-                  <div class="text-muted">No data</div>
-                {% endif %}
+          <!-- Section 2: Affected by Year only -->
+          <div class="border-start border-3 border-success ps-3 mb-4">
+            <div class="row">
+              <div class="col-md-5">
+                <h5 class="mb-1">
+                  Tickets Sold per Month
+                  <span class="badge bg-success" style="font-size:0.6rem;">Y</span>
+                  <small class="text-muted">({{ staff_data.selected_year }})</small>
+                </h5>
+                <p class="text-muted small mb-3">Affected by: Year filter only.</p>
+                <canvas id="staffTicketsPerMonthChart"></canvas>
+              </div>
+              <div class="col-md-3">
+                <h5 class="mb-1">
+                  Delay vs On-Time
+                  <span class="badge bg-success" style="font-size:0.6rem;">Y</span>
+                  <small class="text-muted">({{ staff_data.selected_year }})</small>
+                </h5>
+                <p class="text-muted small mb-3">Affected by: Year filter only.</p>
+                <canvas id="staffDelayChart"></canvas>
+              </div>
+              <div class="col-md-4">
+                <h5 class="mb-1">
+                  Top Destinations
+                  <span class="badge bg-success" style="font-size:0.6rem;">Y</span>
+                  <small class="text-muted">({{ staff_data.selected_year }})</small>
+                </h5>
+                <p class="text-muted small mb-3">Affected by: Year filter only.</p>
+                <ul class="list-group">
+                  {% for dest in staff_data.top_destinations_1y %}
+                  <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ dest.arrival_airport }} ({{ dest.airport_city }})
+                    <span class="badge bg-primary rounded-pill">{{ dest.tickets_sold }} tickets</span>
+                  </li>
+                  {% else %}
+                  <li class="list-group-item text-muted">No data</li>
+                  {% endfor %}
+                </ul>
               </div>
             </div>
-            <div class="col-md-8">
-              <h5 class="mb-3">Tickets Sold per Month (Last 12 Months)</h5>
-              <canvas id="staffTicketsPerMonthChart"></canvas>
-            </div>
           </div>
 
-          <div class="row">
-            <div class="col-md-5">
-              <h5 class="mb-3">Delay vs On-Time</h5>
-              <canvas id="staffDelayChart"></canvas>
-            </div>
-            <div class="col-md-7">
-              <div class="row">
-                <div class="col-md-6">
-                  <h5 class="mb-3">Top Destinations (Last 3 Months)</h5>
-                  <ul class="list-group">
-                    {% for dest in staff_data.top_destinations_3m %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                      {{ dest.arrival_airport }} ({{ dest.airport_city }})
-                      <span class="badge bg-primary rounded-pill">{{ dest.tickets_sold }} tickets</span>
-                    </li>
-                    {% else %}
-                    <li class="list-group-item text-muted">No data</li>
-                    {% endfor %}
-                  </ul>
+          <!-- Section 3: Not affected by any filter -->
+          <div class="border-start border-3 border-secondary ps-3 mb-4">
+            <div class="row">
+              <div class="col-md-4">
+                <h5 class="mb-1">
+                  Most Frequent Customer
+                  <span class="badge bg-secondary" style="font-size:0.6rem;">&mdash;</span>
+                  <small class="text-muted">(Last Year)</small>
+                </h5>
+                <p class="text-muted small mb-2">Not affected by any filter.</p>
+                <div class="border rounded p-3 text-center bg-light">
+                  {% if staff_data.most_frequent_customer %}
+                    <div class="h6 mb-0">{{ staff_data.most_frequent_customer.customer_email }}</div>
+                    <div class="small">Tickets: {{ staff_data.most_frequent_customer.ticket_count }}</div>
+                  {% else %}
+                    <div class="text-muted">No data</div>
+                  {% endif %}
                 </div>
-                <div class="col-md-6">
-                  <h5 class="mb-3">Top Destinations ({{ staff_data.selected_year }})</h5>
-                  <ul class="list-group">
-                    {% for dest in staff_data.top_destinations_1y %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                      {{ dest.arrival_airport }} ({{ dest.airport_city }})
-                      <span class="badge bg-primary rounded-pill">{{ dest.tickets_sold }} tickets</span>
-                    </li>
-                    {% else %}
-                    <li class="list-group-item text-muted">No data</li>
-                    {% endfor %}
-                  </ul>
-                </div>
+              </div>
+              <div class="col-md-4">
+                <h5 class="mb-1">
+                  Top Destinations
+                  <span class="badge bg-secondary" style="font-size:0.6rem;">&mdash;</span>
+                  <small class="text-muted">(Last 3 Months)</small>
+                </h5>
+                <p class="text-muted small mb-2">Not affected by any filter.</p>
+                <ul class="list-group">
+                  {% for dest in staff_data.top_destinations_3m %}
+                  <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ dest.arrival_airport }} ({{ dest.airport_city }})
+                    <span class="badge bg-primary rounded-pill">{{ dest.tickets_sold }} tickets</span>
+                  </li>
+                  {% else %}
+                  <li class="list-group-item text-muted">No data</li>
+                  {% endfor %}
+                </ul>
               </div>
             </div>
           </div>
@@ -384,6 +535,21 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script>
+    // Remember and restore scroll position across page reloads
+    (function() {
+      document.addEventListener("submit", function() {
+        sessionStorage.setItem("scrollY", window.scrollY);
+      });
+      var savedScrollY = sessionStorage.getItem("scrollY");
+      if (savedScrollY !== null) {
+        var hasError = document.querySelector(".alert-danger, .alert-warning") !== null;
+        if (!hasError) {
+          window.scrollTo(0, parseInt(savedScrollY, 10));
+        }
+        sessionStorage.removeItem("scrollY");
+      }
+    })();
+
     const chartDataNode = document.getElementById("chart-data");
     const staffTicketsMonthLabels = chartDataNode ? JSON.parse(chartDataNode.dataset.staffTicketsMonthLabels || "[]") : [];
     const staffTicketsMonthValues = chartDataNode ? JSON.parse(chartDataNode.dataset.staffTicketsMonthValues || "[]") : [];

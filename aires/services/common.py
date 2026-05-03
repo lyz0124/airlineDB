@@ -95,3 +95,101 @@ def require_staff_permission(cur, staff_user, required_role):
     if not profile or not staff_has_permission(profile.get("role"), required_role):
         return None, f"{required_role.title()} permission required."
     return profile, None
+
+
+def get_airport_list(cur, limit=10, search=None):
+    """Get a list of airports, optionally filtered by search term, limited by count."""
+    if search:
+        cur.execute(
+            """
+            SELECT airport_name, airport_city
+            FROM airport
+            WHERE airport_name LIKE %s OR airport_city LIKE %s
+            ORDER BY airport_city, airport_name
+            LIMIT %s
+            """,
+            (f"%{search}%", f"%{search}%", limit),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT airport_name, airport_city
+            FROM airport
+            ORDER BY airport_city, airport_name
+            LIMIT %s
+            """,
+            (limit,),
+        )
+    return cur.fetchall()
+
+
+def get_airplane_list(cur, airline_name, limit=10):
+    """Get a list of airplanes for a given airline, limited by count."""
+    cur.execute(
+        """
+        SELECT airplane_id, seat_capacity
+        FROM airplane
+        WHERE airline_name = %s
+        ORDER BY airplane_id
+        LIMIT %s
+        """,
+        (airline_name, limit),
+    )
+    return cur.fetchall()
+
+
+def get_airline_list(cur):
+    """Get a list of all distinct airline names from the flight table."""
+    cur.execute(
+        """
+        SELECT DISTINCT airline_name
+        FROM flight
+        ORDER BY airline_name
+        """
+    )
+    return [row["airline_name"] for row in cur.fetchall()]
+
+
+def get_staff_members(cur, airline_name, search=None):
+    """Get staff members for a given airline, optionally filtered by search term."""
+    if search:
+        cur.execute(
+            """
+            SELECT username, first_name, last_name, role, airline_name
+            FROM airline_staff
+            WHERE airline_name = %s
+              AND (username LIKE %s OR first_name LIKE %s OR last_name LIKE %s)
+            ORDER BY role, username
+            """,
+            (airline_name, f"%{search}%", f"%{search}%", f"%{search}%"),
+        )
+    else:
+        cur.execute(
+            """
+            SELECT username, first_name, last_name, role, airline_name
+            FROM airline_staff
+            WHERE airline_name = %s
+            ORDER BY role, username
+            """,
+            (airline_name,),
+        )
+    return cur.fetchall()
+
+
+def update_staff_role(cur, username, new_role, airline_name):
+    """Update a staff member's role. Only allows valid roles."""
+    valid_roles = {"admin", "operator", "both"}
+    if new_role not in valid_roles:
+        return False, "Invalid role. Must be one of: admin, operator, both."
+
+    cur.execute(
+        """
+        UPDATE airline_staff
+        SET role = %s
+        WHERE username = %s AND airline_name = %s
+        """,
+        (new_role, username, airline_name),
+    )
+    if cur.rowcount == 0:
+        return False, "Staff member not found or not in your airline."
+    return True, f"Role for {username} updated to {new_role}."

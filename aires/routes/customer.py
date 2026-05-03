@@ -3,7 +3,7 @@ from flask import Blueprint, flash, redirect, render_template, request, session,
 from ..decorators import role_required
 from ..db import with_cursor
 from ..services.dashboard_service import load_customer_dashboard
-from ..services.purchase_service import create_purchase
+from ..services.purchase_service import cancel_purchase, create_purchase
 
 bp = Blueprint("customer", __name__, url_prefix="/customer")
 
@@ -52,4 +52,27 @@ def customer_purchase():
         print(f"[customer_purchase][error] {e}")
         flash("Purchase failed. Please try again.", "danger")
     return redirect(url_for("customer.customer_dashboard", tab="customer-search"))
+
+
+@bp.route("/cancel", methods=["POST"])
+@role_required("customer")
+def customer_cancel():
+    customer_email = session["user_id"]
+    ticket_id_text = request.form.get("ticket_id", "").strip()
+    if not ticket_id_text.isdigit():
+        flash("Invalid ticket ID.", "warning")
+        return redirect(url_for("customer.customer_dashboard"))
+
+    try:
+        with with_cursor() as cur:
+            success, message = cancel_purchase(cur, int(ticket_id_text), customer_email)
+            if success:
+                cur.connection.commit()
+            else:
+                cur.connection.rollback()
+            flash(message, "success" if success else "danger")
+    except Exception as e:
+        print(f"[customer_cancel][error] {e}")
+        flash("Cancellation failed. Please try again.", "danger")
+    return redirect(url_for("customer.customer_dashboard"))
 

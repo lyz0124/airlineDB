@@ -6,7 +6,14 @@ import pymysql
 
 from ..decorators import role_required
 from ..db import with_cursor
-from ..services.common import get_staff_profile, resolve_airport_code, staff_has_permission
+from ..services.common import (
+    get_staff_members,
+    get_staff_profile,
+    require_staff_permission,
+    resolve_airport_code,
+    staff_has_permission,
+    update_staff_role,
+)
 from ..services.dashboard_service import load_staff_dashboard
 from ..services.staff_service import build_flight_update_payload
 
@@ -59,11 +66,17 @@ def staff_add_airport():
                 """,
                 (airport_name, airport_city),
             )
-            cur.connection.commit()
-            flash("Airport added successfully.")
+            if cur.rowcount == 0:
+                flash("Airport already exists: this airport code is already in use.", "warning")
+            else:
+                cur.connection.commit()
+                flash("Airport added successfully.")
+    except pymysql.IntegrityError as e:
+        print(f"[staff_add_airport][integrity_error] {e}")
+        flash("Failed to add airport: the airport code already exists or the city is invalid.", "danger")
     except Exception as e:
         print(f"[staff_add_airport][error] {e}")
-        flash("Failed to add airport.")
+        flash("Failed to add airport.", "danger")
     return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
 
@@ -95,10 +108,10 @@ def staff_add_airplane():
             flash("Airplane added successfully.")
     except pymysql.IntegrityError as e:
         print(f"[staff_add_airplane][integrity_error] {e}")
-        flash("Failed to add airplane: duplicate airplane ID for this airline.")
+        flash("Failed to add airplane: an airplane with this ID already exists for this airline.", "danger")
     except Exception as e:
         print(f"[staff_add_airplane][error] {e}")
-        flash("Failed to add airplane.")
+        flash("Failed to add airplane.", "danger")
     return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
 
 
@@ -352,3 +365,31 @@ def staff_update_flight_status():
         print(f"[staff_update_flight_status][error] {e}")
         flash("Failed to update status.")
     return redirect(url_for("staff.staff_dashboard", tab="staff-operator"))
+
+
+@bp.route("/update-staff-role", methods=["POST"])
+@role_required("airline_staff")
+def staff_update_role():
+    staff_user = session["user_id"]
+    target_username = request.form.get("target_username", "").strip()
+    new_role = request.form.get("new_role", "").strip().lower()
+
+    if not target_username or not new_role:
+        flash("Username and role are required.", "warning")
+        return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
+
+    try:
+        with with_cursor() as cur:
+            profile = get_staff_profile(cur, staff_user)
+            if not profile or not staff_has_permission(profile.get("role"), "admin"):
+                flash("Admin permission required.", "danger")
+                return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))
+
+            success, message = update_staff_role(cur, target_username, new_role, profile["airline_name"])
+            if success:
+                cur.connection.commit()
+            flash(message, "success" if success else "danger")
+    except Exception as e:
+        print(f"[staff_update_role][error] {e}")
+        flash("Failed to update role.", "danger")
+    return redirect(url_for("staff.staff_dashboard", tab="staff-admin"))

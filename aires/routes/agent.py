@@ -3,7 +3,7 @@ from flask import Blueprint, flash, redirect, render_template, request, session,
 from ..decorators import role_required
 from ..db import with_cursor
 from ..services.dashboard_service import load_agent_dashboard
-from ..services.purchase_service import create_purchase, is_agent_authorized
+from ..services.purchase_service import cancel_purchase, create_purchase, is_agent_authorized
 
 bp = Blueprint("agent", __name__, url_prefix="/agent")
 
@@ -63,4 +63,27 @@ def agent_purchase():
         print(f"[agent_purchase][error] {e}")
         flash("Purchase failed. Please try again.", "danger")
     return redirect(url_for("agent.agent_dashboard", tab="agent-search"))
+
+
+@bp.route("/cancel", methods=["POST"])
+@role_required("booking_agent")
+def agent_cancel():
+    agent_email = session["user_id"]
+    ticket_id_text = request.form.get("ticket_id", "").strip()
+    if not ticket_id_text.isdigit():
+        flash("Invalid ticket ID.", "warning")
+        return redirect(url_for("agent.agent_dashboard"))
+
+    try:
+        with with_cursor() as cur:
+            success, message = cancel_purchase(cur, int(ticket_id_text), "", agent_email=agent_email)
+            if success:
+                cur.connection.commit()
+            else:
+                cur.connection.rollback()
+            flash(message, "success" if success else "danger")
+    except Exception as e:
+        print(f"[agent_cancel][error] {e}")
+        flash("Cancellation failed. Please try again.", "danger")
+    return redirect(url_for("agent.agent_dashboard"))
 

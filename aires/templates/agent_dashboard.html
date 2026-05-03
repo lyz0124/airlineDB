@@ -95,6 +95,7 @@
                   <th>Route</th>
                   <th>Departure Time</th>
                   <th>Price</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -108,9 +109,15 @@
                   <td>{{ row.departure_airport }} -> {{ row.arrival_airport }}</td>
                   <td>{{ row.departure_time }}</td>
                   <td>{{ row.price }}</td>
+                  <td>
+                    <form method="post" action="{{ url_for('agent.agent_cancel') }}" class="d-inline" onsubmit="return confirmCancel('{{ row.ticket_id }}', '{{ row.departure_time }}')">
+                      <input type="hidden" name="ticket_id" value="{{ row.ticket_id }}">
+                      <button class="btn btn-sm btn-outline-danger" type="submit">Cancel</button>
+                    </form>
+                  </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="8" class="text-muted">No tickets sold yet.</td></tr>
+                <tr><td colspan="9" class="text-muted">No tickets sold yet.</td></tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -194,6 +201,28 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script>
+    // Remember and restore scroll position across page reloads
+    (function() {
+      document.addEventListener("submit", function() {
+        sessionStorage.setItem("scrollY", window.scrollY);
+      });
+      var savedScrollY = sessionStorage.getItem("scrollY");
+      if (savedScrollY !== null) {
+        var hasError = document.querySelector(".alert-danger, .alert-warning") !== null;
+        if (!hasError) {
+          window.scrollTo(0, parseInt(savedScrollY, 10));
+        }
+        sessionStorage.removeItem("scrollY");
+      }
+    })();
+
+    function confirmCancel(ticketId, departureTime) {
+      const msg = "Are you sure you want to cancel ticket " + ticketId + "?\n\n" +
+                  "Departure: " + departureTime + "\n" +
+                  "Cancellations are only allowed at least 24 hours before departure.";
+      return confirm(msg);
+    }
+
     const chartDataNode = document.getElementById("chart-data");
     const agentTopTicketsLabels = chartDataNode ? JSON.parse(chartDataNode.dataset.agentTopTicketsLabels || "[]") : [];
     const agentTopTicketsValues = chartDataNode ? JSON.parse(chartDataNode.dataset.agentTopTicketsValues || "[]") : [];

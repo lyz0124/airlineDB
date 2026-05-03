@@ -5,6 +5,7 @@ import pymysql
 
 from ..db import with_cursor
 from ..utils import split_name, verify_password
+from ..services.common import get_airline_list
 
 bp = Blueprint("auth", __name__)
 
@@ -19,7 +20,13 @@ def home():
 @bp.route("/register", methods=["GET", "POST"])
 def register_page():
     if request.method == "GET":
-        return render_template("register.html")
+        airline_list = []
+        try:
+            with with_cursor() as cur:
+                airline_list = get_airline_list(cur)
+        except Exception as e:
+            print(f"[register][airline_list_error] {e}")
+        return render_template("register.html", airline_list=airline_list)
 
     role = request.form.get("role", "").strip()
     username = request.form.get("username", "").strip()

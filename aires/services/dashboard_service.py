@@ -1,6 +1,14 @@
 from datetime import date, timedelta
 
-from ..services.common import add_location_filter, extract_location, get_location_options, get_staff_profile
+from ..services.common import (
+    add_location_filter,
+    extract_location,
+    get_airplane_list,
+    get_airport_list,
+    get_location_options,
+    get_staff_members,
+    get_staff_profile,
+)
 from ..utils import fill_monthly_series, month_labels_between, parse_date
 
 
@@ -696,4 +704,7 @@ def load_staff_dashboard(cur, staff_user, args):
         "delay_stats": delay_stats,
         "top_destinations_3m": top_destinations_3m,
         "top_destinations_1y": top_destinations_1y,
+        "airport_list": get_airport_list(cur, 10),
+        "airplane_list": get_airplane_list(cur, airline_name, 10),
+        "staff_members": get_staff_members(cur, airline_name, args.get("staff_search", "").strip() or None),
     }

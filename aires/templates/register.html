@@ -98,10 +98,7 @@
               <div id="agent-fields" class="d-none">
                 <hr class="my-3">
                 <h5 class="mb-3">Booking Agent Fields</h5>
-                <div class="col-md-6 ps-0">
-                  <label class="form-label">Booking Agent ID</label>
-                  <input class="form-control role-agent" name="booking_agent_id">
-                </div>
+                <p class="text-muted small">No additional fields required for booking agents.</p>
               </div>
 
               <div id="staff-fields" class="d-none">
@@ -110,7 +107,12 @@
                 <div class="row g-3">
                   <div class="col-md-6">
                     <label class="form-label">Airline Name</label>
-                    <input class="form-control role-staff" name="airline_name">
+                    <input class="form-control role-staff" name="airline_name" list="airline-options" placeholder="Start typing to search airlines">
+                    <datalist id="airline-options">
+                      {% for airline in airline_list %}
+                        <option value="{{ airline }}">
+                      {% endfor %}
+                    </datalist>
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">Date of Birth</label>
